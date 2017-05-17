@@ -25,6 +25,7 @@
 # Explicit files to ignore (only matches one).
 #==============================================================================#
 # Various tag programs
+/build
 /tags
 /TAGS
 /GPATH
@@ -70,3 +71,12 @@ docs/_build
 #==============================================================================#
 bindings/go/llvm/llvm_config.go
 bindings/go/llvm/workdir
+
+#==============================================================================#
+# Files for Buck build
+#==============================================================================#
+/buck-out
+/.buckd
+/buckaroo
+.buckconfig.local
+BUCKAROO_DEPS
