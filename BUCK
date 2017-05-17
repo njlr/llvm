@@ -1,4 +1,5 @@
 from os.path import basename
+from os.path import dirname
 
 def merge_dicts(x, y):
   z = x.copy()
@@ -102,20 +103,6 @@ genrule(
   cmd = 'cp $(location :cmake)/include/llvm/Config/Disassemblers.def $OUT',
 )
 
-# prebuilt_cxx_library(
-#   name = 'llvm-headers',
-#   header_only = True,
-#   header_namespace = 'llvm',
-#   exported_headers = merge_dicts(subdir_glob([
-#     ('include/llvm', '**/*.h'),
-#     ('include/llvm', '**/*.def'),
-#   ]), {
-#     'Config/config.h': ':config.h',
-#     'Config/llvm-config.h': ':llvm-config.h',
-#     'Config/abi-breaking.h': ':abi-breaking.h',
-#   }),
-# )
-
 prebuilt_cxx_library(
   name = 'config',
   header_only = True,
@@ -131,223 +118,7 @@ prebuilt_cxx_library(
     'Config/AsmPrinters.def': ':AsmPrinters.def',
     'Config/Disassemblers.def': ':Disassemblers.def',
   }),
-  deps = [
-  ],
 )
-
-# targets = [
-#   'AArch64',
-#   'AMDGPU',
-#   'ARM',
-#   'AVR',
-#   'BPF',
-#   'Hexagon',
-#   'Lanai',
-#   'MSP430',
-#   'Mips',
-#   'NVPTX',
-#   # 'PowerPC',
-#   'RISCV',
-#   'Sparc',
-#   'SystemZ',
-#   'WebAssembly',
-#   'X86',
-#   'XCore',
-# ]
-
-def generate_intrinsics(target):
-  genrule(
-    name = target + 'GenIntrinsics.inc',
-    out = target + 'GenIntrinsics.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-intrinsic -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenIntrinsics.inc'
-
-def generate_system_operands(target):
-  genrule(
-    name = target + 'GenSystemOperands.inc',
-    out = target + 'GenSystemOperands.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-searchable-tables -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenSystemOperands.inc'
-
-def generate_asm_writer(target):
-  genrule(
-    name = target + 'GenAsmWriter.inc',
-    out = target + 'GenAsmWriter.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-asm-writer -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenAsmWriter.inc'
-
-def generate_register_info(target):
-  return "aah"
-
-def generate_intrinsic_info(target):
-  genrule(
-    name = target + 'GenInstrInfo.inc',
-    out = target + 'GenInstrInfo.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-instr-info -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenInstrInfo.inc'
-
-def generate_disassembler_tables(target):
-  genrule(
-    name = target + 'GenDisassemblerTables.inc',
-    out = target + 'GenDisassemblerTables.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-disassembler -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenInstrInfo.inc'
-
-def generate_subtarget_info(target):
-  genrule(
-    name = target + 'GenSubtargetInfo.inc',
-    out = target + 'GenSubtargetInfo.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-subtarget -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenInstrInfo.inc'
-
-def generate_callingconv(target):
-  genrule(
-    name = target + 'GenCallingConv.inc',
-    out = target + 'GenCallingConv.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-callingconv -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenCallingConv.inc'
-
-def generate_pseudo_lowering(target):
-  genrule(
-    name = target + 'GenMCPseudoLowering.inc',
-    out = target + 'GenMCPseudoLowering.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-pseudo-lowering -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenMCPseudoLowering.inc'
-
-def generate_dag_isel(target):
-  genrule(
-    name = target + 'GenDAGISel.inc',
-    out = target + 'GenDAGISel.inc',
-    srcs = glob([
-      'include/llvm/**/*.td',
-      'lib/Target/' + target + '/*.td',
-    ]),
-    cmd = 'llvm-tblgen -gen-dag-isel -I $SRCDIR/include -I $SRCDIR/lib/target/' + target + ' $SRCDIR/lib/Target/' + target + '/' + target + '.td -o $OUT',
-  )
-  return ':' + target + 'GenDAGISel.inc'
-
-# windows_sources = glob([
-#   'lib/DebugInfo/PDB/**/*.cpp',
-# ])
-#
-# platform_sources = windows_sources
-
-# cxx_library(
-#   name = 'llvm',
-#   header_namespace = '',
-#   exported_headers = merge_dicts(subdir_glob([
-#     ('include', '**/*.h'),
-#     ('include', '**/*.inc'),
-#     ('include', '**/*.def'),
-#     # ('include', '**/*.gen'),
-#   ]), {
-#     'llvm/Config/config.h': ':config.h',
-#     'llvm/Config/llvm-config.h': ':llvm-config.h',
-#     'llvm/Config/abi-breaking.h': ':abi-breaking.h',
-#     'llvm/Config/Targets.def': ':Targets.def',
-#     'llvm/Config/AsmParsers.def': ':AsmParsers.def',
-#     'llvm/Config/AsmPrinters.def': ':AsmPrinters.def',
-#     'llvm/Config/Disassemblers.def': ':Disassemblers.def',
-#     'llvm/Support/DataTypes.h': ':DataTypes.h',
-#     'llvm/IR/Attributes.gen': ':Attributes.gen',
-#     'llvm/IR/Intrinsics.gen': ':Intrinsics.gen',
-#   }),
-#   headers = merge_dicts(subdir_glob([
-#     ('lib/Fuzzer', '**/*.h'),
-#     ('lib/Target/AArch64', '**/*.h'),
-#     ('lib/Target/AMDGPU', '**/*.h'),
-#     ('lib/Target/ARM', '**/*.h'),
-#     ('lib/Target/AVR', '**/*.h'),
-#     ('lib/Target/BPF', '**/*.h'),
-#     ('lib/Target/Hexagon', '**/*.h'),
-#     ('lib/Target/Lanai', '**/*.h'),
-#     ('lib/Target/Mips', '**/*.h'),
-#     ('lib/Target/MSP430', '**/*.h'),
-#     ('lib/Target/NVPTX', '**/*.h'),
-#     ('lib/Target/PowerPC', '**/*.h'),
-#     ('lib/Target/RISCV', '**/*.h'),
-#     ('lib/Target/Sparc', '**/*.h'),
-#     ('lib/Target/SystemZ', '**/*.h'),
-#     ('lib/Target/WebAssembly', '**/*.h'),
-#     ('lib/Target/X86', '**/*.h'),
-#     ('lib/Target/XCore', '**/*.h'),
-#   ]),
-#   dict(
-#     # [ (x + 'GenIntrinsics.inc',         generate_intrinsics(x))          for x in targets ] +
-#     # [ (x + 'GenAsmWriter.inc',          generate_asm_writer(x))          for x in targets ] +
-#     # [ (x + 'GenRegisterInfo.inc',       generate_register_info(x))       for x in targets ] +
-#     # [ (x + 'GenInstrInfo.inc',          generate_intrinsic_info(x))      for x in targets ] +
-#     # [ (x + 'GenDisassemblerTables.inc', generate_disassembler_tables(x)) for x in targets ] +
-#     # [ (x + 'GenSubtargetInfo.inc',      generate_subtarget_info(x))      for x in targets ] +
-#     # [ (x + 'GenCallingConv.inc',        generate_callingconv(x))         for x in targets ] +
-#     # [ (x + 'GenSystemOperands.inc',     generate_system_operands(x))     for x in targets ] +
-#     # [ (x + 'GenDAGISel.inc',            generate_dag_isel(x))            for x in targets ] +
-#     # [ (x + 'GenMCPseudoLowering.inc',   generate_pseudo_lowering(x))     for x in targets ]
-#   )),
-#   srcs = glob([
-#     'lib/**/*.cpp',
-#     # 'lib/Analysis/**/*.cpp',
-#     # 'lib/Demangle/**/*.cpp',
-#     # 'lib/Support/**/*.cpp',
-#     # 'lib/Support/**/*.c',
-#     # 'lib/TableGen/**/*.cpp',
-#   ], excludes = platform_sources + [
-#     'lib/Target/ARM/ARMLegalizerInfo.cpp',
-#     'lib/Target/AArch64/AArch64RegisterBankInfo.cpp',
-#   ]),
-#   platform_srcs = [
-#     ('^windows.*', windows_sources),
-#   ],
-#   compiler_flags = [
-#     '-std=c++14',
-#   ],
-#   exported_linker_flags = [
-#     '-lcurses',
-#   ],
-#   visibility = [
-#     'PUBLIC',
-#   ],
-# )
 
 prebuilt_cxx_library(
   name = 'adt',
@@ -424,6 +195,7 @@ cxx_library(
   ],
   exported_linker_flags = [
     '-lcurses',
+    '-lz',
   ],
   deps = [
     ':config',
@@ -468,8 +240,12 @@ cxx_library(
     ('include/llvm', 'Passes/**/*.h'),
   ]),
   headers = subdir_glob([
-    ('include/llvm', '**/*.h'),
-    ('include/llvm', '**/*.def'),
+    ('include/llvm', 'Analysis/**/*.h'),
+    ('include/llvm', 'Analysis/**/*.def'),
+    ('include/llvm', 'Target/*.h'),
+    ('include/llvm', 'Transforms/**/*.h'),
+    ('include/llvm', 'ProfileData/**/*.h'),
+    ('include/llvm', 'ProfileData/**/*.inc'),
   ]),
   srcs = glob([
     'lib/Passes/**/*.cpp',
@@ -480,6 +256,8 @@ cxx_library(
   deps = [
     ':adt',
     ':support',
+    ':ir',
+    ':mc',
   ],
 )
 
@@ -501,22 +279,39 @@ genrule(
   cmd = '$(location :llvm-tblgen) -gen-intrinsic -I $SRCDIR/include $SRCDIR/include/llvm/IR/Intrinsics.td -o $OUT',
 )
 
+genrule(
+  name = 'AttributesCompatFunc.inc',
+  out = 'AttributesCompatFunc.inc',
+  srcs = glob([
+    'include/llvm/IR/**/*.gen',
+    'include/llvm/IR/**/*.td',
+    'lib/IR/**/*.td',
+  ]),
+  cmd = '$(location :llvm-tblgen) -gen-attrs -I $SRCDIR/include $SRCDIR/lib/IR/AttributesCompatFunc.td -o $OUT',
+)
+
 cxx_library(
   name = 'ir',
-  header_namespace = 'llvm',
+  header_namespace = '',
   exported_headers = merge_dicts(subdir_glob([
-    ('include/llvm', 'Pass.h'),
-    ('include/llvm', 'PassInfo.h'),
-    ('include/llvm', 'PassSupport.h'),
-    ('include/llvm', 'PassRegistry.h'),
-    ('include/llvm', 'PassAnalysisSupport.h'),
-    ('include/llvm', 'InitializePasses.h'),
-    ('include/llvm', 'IR/**/*.h'),
-    ('include/llvm', 'IR/**/*.def'),
-    ('include/llvm', 'IR/**/*.gen'),
+    ('include', 'llvm/IR/**/*.h'),
+    ('include', 'llvm/IR/**/*.def'),
+    ('include', 'llvm/IR/**/*.gen'),
   ]), {
-    'IR/Attributes.gen': ':Attributes.gen',
-    'IR/Intrinsics.gen': ':Intrinsics.gen',
+    'llvm/IR/Attributes.gen': ':Attributes.gen',
+    'llvm/IR/Intrinsics.gen': ':Intrinsics.gen',
+  }),
+  headers = merge_dicts(subdir_glob([
+    ('include', 'llvm/Pass.h'),
+    ('include', 'llvm/PassInfo.h'),
+    ('include', 'llvm/PassSupport.h'),
+    ('include', 'llvm/PassRegistry.h'),
+    ('include', 'llvm/PassAnalysisSupport.h'),
+    ('include', 'llvm/InitializePasses.h'),
+    ('include', 'llvm/Analysis/**/*.h'),
+    ('include', 'llvm/Bitcode/**/*.h'),
+  ]), {
+    'AttributesCompatFunc.inc': ':AttributesCompatFunc.inc',
   }),
   srcs = glob([
     'lib/IR/**/*.cpp',
@@ -537,6 +332,12 @@ cxx_library(
     ('include/llvm', 'Analysis/**/*.h'),
     ('include/llvm', 'Analysis/**/*.def'),
   ]),
+  headers = subdir_glob([
+    ('include/llvm', 'ProfileData/**/*.h'),
+    ('include/llvm', 'ProfileData/**/*.inc'),
+    ('include/llvm', 'Transforms/**/*.h'),
+    ('include/llvm', 'Object/**/*.h'),
+  ]),
   srcs = glob([
     'lib/Analysis/**/*.cpp',
   ]),
@@ -546,6 +347,7 @@ cxx_library(
   deps = [
     ':adt',
     ':ir',
+    ':passes',
   ],
 )
 
@@ -565,6 +367,8 @@ cxx_library(
     ':adt',
     ':support',
     ':ir',
+    ':analysis',
+    ':passes',
   ],
 )
 
@@ -606,11 +410,7 @@ cxx_library(
   deps = [
     ':adt',
     ':support',
-    # ':mc',
     ':ir',
-    # ':analysis',
-    # ':passes',
-    # ':bitcode',
     ':object',
   ],
 )
@@ -631,6 +431,7 @@ cxx_library(
     ':adt',
     ':support',
     ':ir',
+    ':passes',
   ],
 )
 
@@ -660,6 +461,9 @@ cxx_library(
   exported_headers = subdir_glob([
     ('include/llvm', 'Linker/**/*.h'),
   ]),
+  headers = subdir_glob([
+    ('include/llvm', 'Transforms/**/*.h'),
+  ]),
   srcs = glob([
     'lib/Linker/**/*.cpp',
   ]),
@@ -668,10 +472,10 @@ cxx_library(
   ],
   deps = [
     ':adt',
-    # ':llvm-c',
-    # ':support',
-    # ':asmparser',
-    # ':bitcode',
+    ':support',
+    ':ir',
+    ':analysis',
+    ':passes',
   ],
 )
 
@@ -699,6 +503,12 @@ cxx_library(
   ],
 )
 
+debuginfo_windows_sources = glob([
+  'lib/DebugInfo/PDB/**/*.cpp',
+])
+
+debuginfo_platform_sources = debuginfo_windows_sources
+
 cxx_library(
   name = 'debuginfo',
   header_namespace = 'llvm',
@@ -708,10 +518,14 @@ cxx_library(
   ]),
   headers = subdir_glob([
     ('include/llvm', 'Object/**/*.h'),
+    ('include/llvm', 'MC/**/*.h'),
   ]),
   srcs = glob([
     'lib/DebugInfo/**/*.cpp',
-  ]),
+  ], excludes = debuginfo_platform_sources),
+  platform_srcs = [
+    ('^windows.*', debuginfo_windows_sources),
+  ],
   compiler_flags = [
     '-std=c++14',
   ],
@@ -719,7 +533,6 @@ cxx_library(
     ':adt',
     ':config',
     ':support',
-    # ':object',
   ],
 )
 
@@ -771,12 +584,14 @@ cxx_library(
   ]),
   srcs = glob([
     'lib/ExecutionEngine/**/*.cpp',
-  ]),
+  ], excludes = glob([
+    'lib/ExecutionEngine/IntelJITEvents/**/*.cpp',
+    'lib/ExecutionEngine/OProfileJIT/**/*.cpp',
+  ])),
   compiler_flags = [
     '-std=c++14',
   ],
   deps = [
-    # ':adt',
     ':config',
     ':ir',
     ':support',
@@ -803,6 +618,51 @@ cxx_library(
     ':support',
     ':mc',
     ':analysis',
+    ':passes',
+  ],
+)
+
+cxx_library(
+  name = 'lto',
+  header_namespace = 'llvm',
+  exported_headers = subdir_glob([
+    ('include/llvm', 'LTO/**/*.h'),
+  ]),
+  srcs = glob([
+    'lib/LTO/*.cpp',
+  ]),
+  compiler_flags = [
+    '-std=c++14',
+  ],
+  deps = [
+    ':adt',
+    ':support',
+    ':ir',
+    ':passes',
+    ':analysis',
+    ':target',
+    ':linker',
+    ':object',
+    ':transforms',
+    ':executionengine',
+  ],
+)
+
+cxx_library(
+  name = 'xray',
+  header_namespace = 'llvm',
+  exported_headers = subdir_glob([
+    ('include/llvm', 'XRay/**/*.h'),
+  ]),
+  srcs = glob([
+    'lib/XRay/*.cpp',
+  ]),
+  compiler_flags = [
+    '-std=c++14',
+  ],
+  deps = [
+    ':adt',
+    ':support',
   ],
 )
 
@@ -933,21 +793,86 @@ cxx_library(
   ],
 )
 
+def tablegen(x, n, t):
+  parent = dirname(x)
+  genrule(
+    name = n,
+    out = n,
+    srcs = glob([
+      'include/llvm/**/*.td',
+      parent + '/**/*.td',
+    ]),
+    cmd = '$(location :llvm-tblgen) ' + t + ' -I $SRCDIR/include -I $SRCDIR/' + parent + ' $SRCDIR/' + x + ' -o $OUT',
+  )
+  prebuilt_cxx_library(
+    name = 'lib' + n,
+    header_namespace = '',
+    header_only = True,
+    exported_headers = {
+      n: ':' + n,
+    },
+  )
+  return ':lib' + n
+
+cxx_library(
+  name = 'x86',
+  header_namespace = '',
+  exported_headers = subdir_glob([
+    ('lib/Target/X86', '**/*.h'),
+  ]),
+  srcs = glob([
+    'lib/Target/X86/**/*.cpp',
+  ], excludes = [
+    'lib/Target/X86/X86CallLowering.cpp',
+    'lib/Target/X86/InstPrinter/X86IntelInstPrinter.cpp',
+  ]),
+  compiler_flags = [
+    '-std=c++14',
+  ],
+  deps = [
+    tablegen('lib/Target/X86/X86.td', 'X86GenRegisterInfo.inc', '-gen-register-info'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenInstrInfo.inc', '-gen-instr-info'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenSubtargetInfo.inc', '-gen-subtarget'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenDAGISel.inc', '-gen-dag-isel'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenFastISel.inc', '-gen-fast-isel'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenAsmWriter.inc', '-gen-asm-writer'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenAsmWriter1.inc', '-gen-asm-writer -asmwriternum=1'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenCallingConv.inc', '-gen-callingconv'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenDisassemblerTables.inc', '-gen-disassembler'),
+    tablegen('lib/Target/X86/X86.td', 'X86GenAsmMatcher.inc', '-gen-asm-matcher'),
+    ':adt',
+    ':passes',
+    ':mc',
+    ':target',
+    ':ir',
+    ':transforms',
+  ],
+)
+
 prebuilt_cxx_library(
   name = 'llvm',
   header_only = True,
   exported_deps = [
-    ':config',
+    # Modules
     ':adt',
-    ':support',
-    ':executionengine',
     ':analysis',
+    ':asmparser',
     ':bitcode',
-    ':passes',
+    ':config',
+    ':executionengine',
     ':ir',
+    ':irreader',
+    ':linker',
+    ':lto',
     ':mc',
+    ':passes',
+    ':profiledata',
+    ':support',
     ':target',
+    ':xray',
+    # Targets
     ':webassembly',
+    ':x86',
   ],
   visibility = [
     'PUBLIC',
