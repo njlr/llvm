@@ -55,6 +55,7 @@ genrule(
     'utils/**/llvm-build',
   ], excludes = glob([
     'examples/BrainF2/**/*',
+    'examples/Fibonacci2/**/*',
   ])),
   cmd = 'mkdir -p $OUT && ' +
         'cd $OUT && ' +
@@ -824,7 +825,7 @@ cxx_library(
     'lib/Target/X86/**/*.cpp',
   ], excludes = [
     'lib/Target/X86/X86CallLowering.cpp',
-    'lib/Target/X86/InstPrinter/X86IntelInstPrinter.cpp',
+    # 'lib/Target/X86/InstPrinter/X86IntelInstPrinter.cpp',
   ]),
   compiler_flags = [
     '-std=c++14',
@@ -858,6 +859,7 @@ prebuilt_cxx_library(
     ':analysis',
     ':asmparser',
     ':bitcode',
+    ':codegen',
     ':config',
     ':executionengine',
     ':ir',
