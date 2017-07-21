@@ -1,123 +1,20 @@
 from os.path import basename
 from os.path import dirname
+import hashlib
 
 def merge_dicts(x, y):
   z = x.copy()
   z.update(y)
   return z;
 
-def filename(x):
-  return basename(x)[0];
-
-genrule(
-  name = 'cmake',
-  out = 'out',
-  srcs = glob([
-    '*.in',
-    '*.txt',
-    '*.TXT',
-    'cmake/**/*.cmake',
-    'cmake/**/*.in',
-    'cmake/**/*.guess',
-    'cmake/**/*.cpp',
-    'cmake/**/*.txt',
-    'docs/**/*.in',
-    'docs/**/*.rst',
-    'docs/**/*.txt',
-    'examples/**/*.cpp',
-    'examples/**/*.txt',
-    'include/**/*.cmake',
-    'include/**/*.build',
-    'include/**/*.h',
-    'include/**/*.in',
-    'include/**/*.txt',
-    'lib/**/*.cpp',
-    'lib/**/*.c',
-    'lib/**/*.txt',
-    'projects/**/*.cpp',
-    'projects/**/*.txt',
-    'runtimes/**/*.in',
-    'runtimes/**/*.txt',
-    'tools/**/*.c',
-    'tools/**/*.cc',
-    'tools/**/*.cpp',
-    'tools/**/*.in',
-    'tools/**/*.txt',
-    'test/**/*',
-    'unittests/**/*',
-    'utils/**/*.h',
-    'utils/**/*.cpp',
-    'utils/**/*.cc',
-    'utils/**/*.c',
-    'utils/**/*.in',
-    'utils/**/*.py',
-    'utils/**/*.txt',
-    'utils/**/llvm-build',
-  ], excludes = glob([
-    'examples2/**/*',
-  ])),
-  cmd = 'mkdir -p $OUT && ' +
-        'cd $OUT && ' +
-        'cmake $SRCDIR',
-)
-
-genrule(
-  name = 'config.h',
-  out = 'config.h',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/config.h $OUT',
-)
-
-genrule(
-  name = 'llvm-config.h',
-  out = 'llvm-config.h',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/llvm-config.h $OUT',
-)
-
-genrule(
-  name = 'abi-breaking.h',
-  out = 'abi-breaking.h',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/abi-breaking.h $OUT',
-)
-
-genrule(
-  name = 'Targets.def',
-  out = 'Targets.def',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/Targets.def $OUT',
-)
-
-genrule(
-  name = 'AsmParsers.def',
-  out = 'AsmParsers.def',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/AsmParsers.def $OUT',
-)
-
-genrule(
-  name = 'AsmPrinters.def',
-  out = 'AsmPrinters.def',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/AsmPrinters.def $OUT',
-)
-
-genrule(
-  name = 'Disassemblers.def',
-  out = 'Disassemblers.def',
-  cmd = 'cp $(location :cmake)/include/llvm/Config/Disassemblers.def $OUT',
-)
-
 prebuilt_cxx_library(
-  name = 'config',
+  name = 'cmake-generated',
   header_only = True,
   header_namespace = 'llvm',
-  exported_headers = merge_dicts(subdir_glob([
-    ('include/llvm', 'Config/**/*.h'),
-  ]), {
-    'Config/config.h': ':config.h',
-    'Config/llvm-config.h': ':llvm-config.h',
-    'Config/abi-breaking.h': ':abi-breaking.h',
-    'Config/Targets.def': ':Targets.def',
-    'Config/AsmParsers.def': ':AsmParsers.def',
-    'Config/AsmPrinters.def': ':AsmPrinters.def',
-    'Config/Disassemblers.def': ':Disassemblers.def',
-  }),
+  exported_headers = subdir_glob([
+    ('cmake-generated/include/llvm', '**/*.h'),
+    ('cmake-generated/include/llvm', '**/*.def'),
+  ]),
 )
 
 prebuilt_cxx_library(
@@ -152,11 +49,8 @@ cxx_binary(
     'lib/TableGen/**/*.cpp',
     'utils/TableGen/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   visibility = [
-    '//...',
+    'PUBLIC',
   ],
   deps = [
     ':adt',
@@ -194,9 +88,6 @@ cxx_library(
   srcs = glob([
     'lib/Demangle/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
 )
 
 prebuilt_cxx_library(
@@ -208,38 +99,27 @@ prebuilt_cxx_library(
   ]),
 )
 
-genrule(
-  name = 'DataTypes.h',
-  out = 'DataTypes.h',
-  cmd = 'cp $(location :cmake)/include/llvm/Support/DataTypes.h $OUT',
-)
-
 cxx_library(
   name = 'support-c',
   srcs = glob([
     'lib/Support/*.c',
   ]),
   deps = [
-    ':config',
+    ':cmake-generated',
   ]
 )
 
 cxx_library(
   name = 'support',
   header_namespace = 'llvm',
-  exported_headers = merge_dicts(subdir_glob([
+  exported_headers = subdir_glob([
     ('include/llvm', 'Support/**/*.h'),
     ('include/llvm', 'Support/**/*.inc'),
     ('include/llvm', 'Support/**/*.def'),
-  ]), {
-    'Support/DataTypes.h': ':DataTypes.h',
-  }),
+  ]),
   srcs = glob([
     'lib/Support/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   exported_linker_flags = [
     '-lcurses',
     '-lz',
@@ -249,7 +129,7 @@ cxx_library(
     ('linux.*', ['-ldl', '-pthread']),
   ],
   deps = [
-    ':config',
+    ':cmake-generated',
     ':adt',
     ':llvm-c',
     ':codegen-headers',
@@ -268,13 +148,10 @@ cxx_library(
   srcs = glob([
     'lib/CodeGen/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':analysis',
     ':support',
-    ':config',
+    ':cmake-generated',
     ':ir',
     ':target',
     ':transforms',
@@ -301,9 +178,6 @@ cxx_library(
   srcs = glob([
     'lib/Passes/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -367,9 +241,6 @@ cxx_library(
   srcs = glob([
     'lib/IR/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -392,9 +263,6 @@ cxx_library(
   srcs = glob([
     'lib/Analysis/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':ir',
@@ -411,9 +279,6 @@ cxx_library(
   srcs = glob([
     'lib/Bitcode/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -432,9 +297,6 @@ cxx_library(
   srcs = glob([
     'lib/Object/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -454,9 +316,6 @@ cxx_library(
   srcs = glob([
     'lib/ObjectYAML/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':support',
   ],
@@ -472,9 +331,6 @@ cxx_library(
   srcs = glob([
     'lib/ProfileData/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -492,9 +348,6 @@ cxx_library(
   srcs = glob([
     'lib/AsmParser/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -512,9 +365,6 @@ cxx_library(
   srcs = glob([
     'lib/IRReader/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':llvm-c',
     ':support',
@@ -532,9 +382,6 @@ cxx_library(
   srcs = glob([
     'lib/Option/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -550,9 +397,6 @@ cxx_library(
   srcs = glob([
     'lib/LibDriver/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/LibDriver/Options.td', 'Options.inc', '-gen-opt-parser-defs'),
     ':adt',
@@ -571,9 +415,6 @@ cxx_library(
   srcs = glob([
     'lib/LineEditor/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -592,9 +433,6 @@ cxx_library(
   srcs = glob([
     'lib/Linker/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -613,9 +451,6 @@ cxx_library(
   srcs = glob([
     'lib/Transforms/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':ir',
     ':analysis',
@@ -651,12 +486,9 @@ cxx_library(
   platform_srcs = [
     ('^windows.*', debuginfo_windows_sources),
   ],
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
-    ':config',
+    ':cmake-generated',
     ':support',
   ],
 )
@@ -670,9 +502,6 @@ cxx_library(
   srcs = glob([
     'lib/MC/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -692,9 +521,6 @@ cxx_library(
   srcs = glob([
     'lib/TableGen/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -713,11 +539,8 @@ cxx_library(
     'lib/ExecutionEngine/IntelJITEvents/**/*.cpp',
     'lib/ExecutionEngine/OProfileJIT/**/*.cpp',
   ])),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
-    ':config',
+    ':cmake-generated',
     ':ir',
     ':support',
     ':debuginfo',
@@ -737,9 +560,6 @@ cxx_library(
     'lib/Fuzzer/FuzzerTracePC.cpp',
     'lib/Fuzzer/test/**/*.cpp',
   ])),
-  compiler_flags = [
-    '-std=c++14',
-  ],
 )
 
 cxx_library(
@@ -752,9 +572,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -773,9 +590,6 @@ cxx_library(
   srcs = glob([
     'lib/LTO/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -799,9 +613,6 @@ cxx_library(
   srcs = glob([
     'lib/XRay/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     ':adt',
     ':support',
@@ -822,9 +633,6 @@ cxx_library(
     'lib/Target/AArch64/AArch64LegalizerInfo.cpp',
     'lib/Target/AArch64/AArch64RegisterBankInfo.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/AArch64/AArch64.td', 'AArch64GenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/AArch64/AArch64.td', 'AArch64GenInstrInfo.inc', '-gen-instr-info'),
@@ -865,9 +673,6 @@ cxx_library(
     'lib/Target/AMDGPU/AMDGPUTargetTransformInfo.cpp',
     'lib/Target/AMDGPU/AMDGPUIntrinsicInfo.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/AMDGPU/AMDGPU.td', 'AMDGPUGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/AMDGPU/AMDGPU.td', 'AMDGPUGenInstrInfo.inc', '-gen-instr-info'),
@@ -904,9 +709,6 @@ cxx_library(
     'lib/Target/ARM/ARMCallLowering.cpp',
     'lib/Target/ARM/ARMInstructionSelector.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/ARM/ARM.td', 'ARMGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/ARM/ARM.td', 'ARMGenInstrInfo.inc', '-gen-instr-info'),
@@ -937,9 +739,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/AVR/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/AVR/AVR.td', 'AVRGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/AVR/AVR.td', 'AVRGenInstrInfo.inc', '-gen-instr-info'),
@@ -969,9 +768,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/BPF/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/BPF/BPF.td', 'BPFGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/BPF/BPF.td', 'BPFGenInstrInfo.inc', '-gen-instr-info'),
@@ -1001,9 +797,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/Hexagon/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/Hexagon/Hexagon.td', 'HexagonGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/Hexagon/Hexagon.td', 'HexagonGenInstrInfo.inc', '-gen-instr-info'),
@@ -1034,9 +827,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/Lanai/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/Lanai/Lanai.td', 'LanaiGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/Lanai/Lanai.td', 'LanaiGenInstrInfo.inc', '-gen-instr-info'),
@@ -1067,9 +857,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/Mips/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/Mips/Mips.td', 'MipsGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/Mips/Mips.td', 'MipsGenInstrInfo.inc', '-gen-instr-info'),
@@ -1101,9 +888,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/MSP430/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/MSP430/MSP430.td', 'MSP430GenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/MSP430/MSP430.td', 'MSP430GenInstrInfo.inc', '-gen-instr-info'),
@@ -1134,9 +918,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/NVPTX/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/NVPTX/NVPTX.td', 'NVPTXGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/NVPTX/NVPTX.td', 'NVPTXGenInstrInfo.inc', '-gen-instr-info'),
@@ -1161,9 +942,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/PowerPC/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/PowerPC/PPC.td', 'PPCGenAsmWriter.inc', '-gen-asm-writer'),
     tablegen('lib/Target/PowerPC/PPC.td', 'PPCGenAsmMatcher.inc', '-gen-asm-matcher'),
@@ -1193,9 +971,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/RISCV/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/RISCV/RISCV.td', 'RISCVGenMCCodeEmitter.inc', '-gen-emitter'),
     tablegen('lib/Target/RISCV/RISCV.td', 'RISCVGenRegisterInfo.inc', '-gen-register-info'),
@@ -1218,9 +993,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/Sparc/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/Sparc/Sparc.td', 'SparcGenAsmWriter.inc', '-gen-asm-writer'),
     tablegen('lib/Target/Sparc/Sparc.td', 'SparcGenAsmMatcher.inc', '-gen-asm-matcher'),
@@ -1249,9 +1021,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/SystemZ/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/SystemZ/SystemZ.td', 'SystemZGenAsmWriter.inc', '-gen-asm-writer'),
     tablegen('lib/Target/SystemZ/SystemZ.td', 'SystemZGenAsmMatcher.inc', '-gen-asm-matcher'),
@@ -1280,9 +1049,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/WebAssembly/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/WebAssembly/WebAssembly.td', 'WebAssemblyGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/WebAssembly/WebAssembly.td', 'WebAssemblyGenInstrInfo.inc', '-gen-instr-info'),
@@ -1311,9 +1077,6 @@ cxx_library(
   ], excludes = [
     'lib/Target/X86/X86CallLowering.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/X86/X86.td', 'X86GenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/X86/X86.td', 'X86GenInstrInfo.inc', '-gen-instr-info'),
@@ -1343,9 +1106,6 @@ cxx_library(
   srcs = glob([
     'lib/Target/XCore/**/*.cpp',
   ]),
-  compiler_flags = [
-    '-std=c++14',
-  ],
   deps = [
     tablegen('lib/Target/XCore/XCore.td', 'XCoreGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/XCore/XCore.td', 'XCoreGenInstrInfo.inc', '-gen-instr-info'),
@@ -1374,7 +1134,7 @@ prebuilt_cxx_library(
     ('include', '**/*.h'),
   ]),
   exported_deps = [
-    ':config',
+    ':cmake-generated',
   ],
   deps = [
     # Modules
