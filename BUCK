@@ -24,6 +24,9 @@ prebuilt_cxx_library(
   exported_headers = subdir_glob([
     ('include/llvm', 'ADT/**/*.h'),
   ]),
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 prebuilt_cxx_library(
@@ -135,6 +138,9 @@ cxx_library(
     ':codegen-headers',
     ':demangle',
     ':support-c',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
