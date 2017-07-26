@@ -26,9 +26,9 @@
 #ifndef LLVM_IR_CALLSITE_H
 #define LLVM_IR_CALLSITE_H
 
-#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Function.h"
@@ -36,10 +36,10 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/IR/Use.h"
 #include "llvm/IR/User.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/Casting.h"
 #include <cassert>
 #include <cstdint>
 #include <iterator>
@@ -207,7 +207,7 @@ public:
 
   /// The type of iterator to use when looping over actual arguments at this
   /// call site.
-  typedef IterTy arg_iterator;
+  using arg_iterator = IterTy;
 
   iterator_range<IterTy> args() const {
     return make_range(arg_begin(), arg_end());
@@ -231,7 +231,7 @@ public:
 
   /// Type of iterator to use when looping over data operands at this call site
   /// (see below).
-  typedef IterTy data_operand_iterator;
+  using data_operand_iterator = IterTy;
 
   /// data_operands_begin/data_operands_end - Return iterators iterating over
   /// the call / invoke argument list and bundle operands.  For invokes, this is

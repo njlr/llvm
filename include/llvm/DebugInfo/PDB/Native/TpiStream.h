@@ -16,11 +16,15 @@
 #include "llvm/DebugInfo/PDB/Native/RawTypes.h"
 #include "llvm/DebugInfo/PDB/PDBTypes.h"
 #include "llvm/Support/BinaryStreamArray.h"
+#include "llvm/Support/BinaryStreamRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "llvm/Support/Error.h"
 
 namespace llvm {
+namespace codeview {
+class LazyRandomTypeCollection;
+}
 namespace msf {
 class MappedBlockStream;
 }
@@ -31,8 +35,7 @@ class TpiStream {
   friend class TpiStreamBuilder;
 
 public:
-  TpiStream(const PDBFile &File,
-            std::unique_ptr<msf::MappedBlockStream> Stream);
+  TpiStream(PDBFile &File, std::unique_ptr<msf::MappedBlockStream> Stream);
   ~TpiStream();
   Error reload();
 
@@ -47,22 +50,31 @@ public:
   uint32_t getHashKeySize() const;
   uint32_t getNumHashBuckets() const;
   FixedStreamArray<support::ulittle32_t> getHashValues() const;
-  FixedStreamArray<TypeIndexOffset> getTypeIndexOffsets() const;
+  FixedStreamArray<codeview::TypeIndexOffset> getTypeIndexOffsets() const;
   HashTable &getHashAdjusters();
 
   codeview::CVTypeRange types(bool *HadError) const;
+  const codeview::CVTypeArray &typeArray() const { return TypeRecords; }
+
+  codeview::LazyRandomTypeCollection &typeCollection() { return *Types; }
+
+  BinarySubstreamRef getTypeRecordsSubstream() const;
 
   Error commit();
 
 private:
-  const PDBFile &Pdb;
+  PDBFile &Pdb;
   std::unique_ptr<msf::MappedBlockStream> Stream;
+
+  std::unique_ptr<codeview::LazyRandomTypeCollection> Types;
+
+  BinarySubstreamRef TypeRecordsSubstream;
 
   codeview::CVTypeArray TypeRecords;
 
   std::unique_ptr<BinaryStream> HashStream;
   FixedStreamArray<support::ulittle32_t> HashValues;
-  FixedStreamArray<TypeIndexOffset> TypeIndexOffsets;
+  FixedStreamArray<codeview::TypeIndexOffset> TypeIndexOffsets;
   HashTable HashAdjusters;
 
   const TpiStreamHeader *Header;

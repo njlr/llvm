@@ -1,4 +1,4 @@
-//===-- HexagonSubtarget.cpp - Hexagon Subtarget Information --------------===//
+//===- HexagonSubtarget.cpp - Hexagon Subtarget Information ---------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,13 +11,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "HexagonSubtarget.h"
 #include "Hexagon.h"
+#include "HexagonInstrInfo.h"
 #include "HexagonRegisterInfo.h"
+#include "HexagonSubtarget.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "MCTargetDesc/HexagonMCTargetDesc.h"
+#include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <algorithm>
+#include <cassert>
 #include <map>
 
 using namespace llvm;
@@ -73,6 +83,10 @@ static cl::opt<bool> OverrideLongCalls("hexagon-long-calls",
   cl::Hidden, cl::ZeroOrMore, cl::init(false),
   cl::desc("If present, forces/disables the use of long calls"));
 
+static cl::opt<bool> EnablePredicatedCalls("hexagon-pred-calls",
+  cl::Hidden, cl::ZeroOrMore, cl::init(false),
+  cl::desc("Consider calls to be predicable"));
+
 void HexagonSubtarget::initializeEnvironment() {
   UseMemOps = false;
   ModeIEEERndNear = false;
@@ -115,9 +129,7 @@ HexagonSubtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
 HexagonSubtarget::HexagonSubtarget(const Triple &TT, StringRef CPU,
                                    StringRef FS, const TargetMachine &TM)
     : HexagonGenSubtargetInfo(TT, CPU, FS), CPUString(CPU),
-      InstrInfo(initializeSubtargetDependencies(CPU, FS)), TLInfo(TM, *this),
-      FrameLowering() {
-
+      InstrInfo(initializeSubtargetDependencies(CPU, FS)), TLInfo(TM, *this) {
   initializeEnvironment();
 
   // Initialize scheduling itinerary for the specified CPU.
@@ -192,7 +204,6 @@ void HexagonSubtarget::adjustSchedDependency(SUnit *Src, SUnit *Dst,
   updateLatency(*SrcInst, *DstInst, Dep);
 }
 
-
 void HexagonSubtarget::HexagonDAGMutation::apply(ScheduleDAGInstrs *DAG) {
   for (auto &SU : DAG->SUnits) {
     if (!SU.isInstr())
@@ -236,17 +247,17 @@ void HexagonSubtarget::HexagonDAGMutation::apply(ScheduleDAGInstrs *DAG) {
   }
 }
 
-
 void HexagonSubtarget::getPostRAMutations(
-      std::vector<std::unique_ptr<ScheduleDAGMutation>> &Mutations) const {
-  Mutations.push_back(make_unique<HexagonSubtarget::HexagonDAGMutation>());
+    std::vector<std::unique_ptr<ScheduleDAGMutation>> &Mutations) const {
+  Mutations.push_back(
+      llvm::make_unique<HexagonSubtarget::HexagonDAGMutation>());
 }
 
 void HexagonSubtarget::getSMSMutations(
-      std::vector<std::unique_ptr<ScheduleDAGMutation>> &Mutations) const {
-  Mutations.push_back(make_unique<HexagonSubtarget::HexagonDAGMutation>());
+    std::vector<std::unique_ptr<ScheduleDAGMutation>> &Mutations) const {
+  Mutations.push_back(
+      llvm::make_unique<HexagonSubtarget::HexagonDAGMutation>());
 }
-
 
 // Pin the vtable to this file.
 void HexagonSubtarget::anchor() {}
@@ -255,6 +266,10 @@ bool HexagonSubtarget::enableMachineScheduler() const {
   if (DisableHexagonMISched.getNumOccurrences())
     return !DisableHexagonMISched;
   return true;
+}
+
+bool HexagonSubtarget::usePredicatedCalls() const {
+  return EnablePredicatedCalls;
 }
 
 void HexagonSubtarget::updateLatency(MachineInstr &SrcInst,
@@ -439,4 +454,3 @@ unsigned HexagonSubtarget::getL1PrefetchDistance() const {
 bool HexagonSubtarget::enableSubRegLiveness() const {
   return EnableSubregLiveness;
 }
-

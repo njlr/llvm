@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "AArch64TargetMachine.h"
 #include "AArch64.h"
 #include "AArch64MacroFusion.h"
 #include "AArch64Subtarget.h"
-#include "AArch64TargetMachine.h"
 #include "AArch64TargetObjectFile.h"
 #include "AArch64TargetTransformInfo.h"
 #include "MCTargetDesc/AArch64MCTargetDesc.h"
@@ -23,6 +23,7 @@
 #include "llvm/CodeGen/GlobalISel/IRTranslator.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
+#include "llvm/CodeGen/GlobalISel/Localizer.h"
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/Passes.h"
@@ -45,6 +46,11 @@ using namespace llvm;
 static cl::opt<bool> EnableCCMP("aarch64-enable-ccmp",
                                 cl::desc("Enable the CCMP formation pass"),
                                 cl::init(true), cl::Hidden);
+
+static cl::opt<bool>
+    EnableCondBrTuning("aarch64-enable-cond-br-tune",
+                       cl::desc("Enable the conditional branch tuning pass"),
+                       cl::init(true), cl::Hidden);
 
 static cl::opt<bool> EnableMCR("aarch64-enable-mcr",
                                cl::desc("Enable the machine combiner pass"),
@@ -109,11 +115,6 @@ EnableA53Fix835769("aarch64-fix-cortex-a53-835769", cl::Hidden,
                 cl::init(false));
 
 static cl::opt<bool>
-    EnableAddressTypePromotion("aarch64-enable-type-promotion", cl::Hidden,
-                               cl::desc("Enable the type promotion pass"),
-                               cl::init(false));
-
-static cl::opt<bool>
     EnableGEPOpt("aarch64-enable-gep-opt", cl::Hidden,
                  cl::desc("Enable optimizations on complex GEPs"),
                  cl::init(false));
@@ -137,6 +138,9 @@ static cl::opt<int> EnableGlobalISelAtO(
     cl::desc("Enable GlobalISel at or below an opt level (-1 to disable)"),
     cl::init(-1));
 
+static cl::opt<bool> EnableFalkorHWPFFix("aarch64-enable-falkor-hwpf-fix",
+                                         cl::init(true), cl::Hidden);
+
 extern "C" void LLVMInitializeAArch64Target() {
   // Register the target.
   RegisterTargetMachine<AArch64leTargetMachine> X(getTheAArch64leTarget());
@@ -146,7 +150,6 @@ extern "C" void LLVMInitializeAArch64Target() {
   initializeGlobalISel(*PR);
   initializeAArch64A53Fix835769Pass(*PR);
   initializeAArch64A57FPLoadBalancingPass(*PR);
-  initializeAArch64AddressTypePromotionPass(*PR);
   initializeAArch64AdvSIMDScalarPass(*PR);
   initializeAArch64CollectLOHPass(*PR);
   initializeAArch64ConditionalComparesPass(*PR);
@@ -158,6 +161,8 @@ extern "C" void LLVMInitializeAArch64Target() {
   initializeAArch64PromoteConstantPass(*PR);
   initializeAArch64RedundantCopyEliminationPass(*PR);
   initializeAArch64StorePairSuppressPass(*PR);
+  initializeFalkorHWPFFixPass(*PR);
+  initializeFalkorMarkStridedAccessesLegacyPass(*PR);
   initializeLDTLSCleanupPass(*PR);
 }
 
@@ -167,6 +172,8 @@ extern "C" void LLVMInitializeAArch64Target() {
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
   if (TT.isOSBinFormatMachO())
     return llvm::make_unique<AArch64_MachoTargetObjectFile>();
+  if (TT.isOSBinFormatCOFF())
+    return llvm::make_unique<AArch64_COFFTargetObjectFile>();
 
   return llvm::make_unique<AArch64_ELFTargetObjectFile>();
 }
@@ -179,6 +186,8 @@ static std::string computeDataLayout(const Triple &TT,
     return "e-m:e-p:32:32-i8:8-i16:16-i64:64-S128";
   if (TT.isOSBinFormatMachO())
     return "e-m:o-i64:64-i128:128-n32:64-S128";
+  if (TT.isOSBinFormatCOFF())
+    return "e-m:w-p:64:64-i32:32-i64:64-i128:128-n32:64-S128";
   if (LittleEndian)
     return "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
   return "E-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128";
@@ -220,7 +229,6 @@ const AArch64Subtarget *
 AArch64TargetMachine::getSubtargetImpl(const Function &F) const {
   Attribute CPUAttr = F.getFnAttribute("target-cpu");
   Attribute FSAttr = F.getFnAttribute("target-features");
-  bool ForCodeSize = F.optForSize();
 
   std::string CPU = !CPUAttr.hasAttribute(Attribute::None)
                         ? CPUAttr.getValueAsString().str()
@@ -228,17 +236,15 @@ AArch64TargetMachine::getSubtargetImpl(const Function &F) const {
   std::string FS = !FSAttr.hasAttribute(Attribute::None)
                        ? FSAttr.getValueAsString().str()
                        : TargetFS;
-  std::string ForCodeSizeStr =
-      std::string(ForCodeSize ? "+" : "-") + "forcodesize";
 
-  auto &I = SubtargetMap[CPU + FS + ForCodeSizeStr];
+  auto &I = SubtargetMap[CPU + FS];
   if (!I) {
     // This needs to be done before we create a new subtarget since any
     // creation will depend on the TM and the code generation flags on the
     // function that reside in TargetOptions.
     resetTargetOptions(F);
     I = llvm::make_unique<AArch64Subtarget>(TargetTriple, CPU, FS, *this,
-                                            isLittle, ForCodeSize);
+                                            isLittle);
   }
   return I.get();
 }
@@ -264,9 +270,9 @@ namespace {
 /// AArch64 Code Generator Pass Configuration Options.
 class AArch64PassConfig : public TargetPassConfig {
 public:
-  AArch64PassConfig(AArch64TargetMachine *TM, PassManagerBase &PM)
+  AArch64PassConfig(AArch64TargetMachine &TM, PassManagerBase &PM)
       : TargetPassConfig(TM, PM) {
-    if (TM->getOptLevel() != CodeGenOpt::None)
+    if (TM.getOptLevel() != CodeGenOpt::None)
       substitutePass(&PostRASchedulerID, &PostMachineSchedulerID);
   }
 
@@ -276,17 +282,19 @@ public:
 
   ScheduleDAGInstrs *
   createMachineScheduler(MachineSchedContext *C) const override {
+    const AArch64Subtarget &ST = C->MF->getSubtarget<AArch64Subtarget>();
     ScheduleDAGMILive *DAG = createGenericSchedLive(C);
     DAG->addMutation(createLoadClusterDAGMutation(DAG->TII, DAG->TRI));
     DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
-    DAG->addMutation(createAArch64MacroFusionDAGMutation());
+    if (ST.hasFusion())
+      DAG->addMutation(createAArch64MacroFusionDAGMutation());
     return DAG;
   }
 
   ScheduleDAGInstrs *
   createPostMachineScheduler(MachineSchedContext *C) const override {
     const AArch64Subtarget &ST = C->MF->getSubtarget<AArch64Subtarget>();
-    if (ST.hasFuseLiterals()) {
+    if (ST.hasFusion()) {
       // Run the Macro Fusion after RA again since literals are expanded from
       // pseudos then (v. addPreSched2()).
       ScheduleDAGMI *DAG = createGenericSchedPostRA(C);
@@ -304,6 +312,7 @@ public:
   bool addIRTranslator() override;
   bool addLegalizeMachineIR() override;
   bool addRegBankSelect() override;
+  void addPreGlobalInstructionSelect() override;
   bool addGlobalInstructionSelect() override;
 #endif
   bool addILPOpts() override;
@@ -324,13 +333,13 @@ TargetIRAnalysis AArch64TargetMachine::getTargetIRAnalysis() {
 }
 
 TargetPassConfig *AArch64TargetMachine::createPassConfig(PassManagerBase &PM) {
-  return new AArch64PassConfig(this, PM);
+  return new AArch64PassConfig(*this, PM);
 }
 
 void AArch64PassConfig::addIRPasses() {
   // Always expand atomic operations, we don't deal with atomicrmw or cmpxchg
   // ourselves.
-  addPass(createAtomicExpandPass(TM));
+  addPass(createAtomicExpandPass());
 
   // Cmpxchg instructions are often used with a subsequent comparison to
   // determine whether it succeeded. We can exploit existing control-flow in
@@ -342,14 +351,18 @@ void AArch64PassConfig::addIRPasses() {
   //
   // Run this before LSR to remove the multiplies involved in computing the
   // pointer values N iterations ahead.
-  if (TM->getOptLevel() != CodeGenOpt::None && EnableLoopDataPrefetch)
-    addPass(createLoopDataPrefetchPass());
+  if (TM->getOptLevel() != CodeGenOpt::None) {
+    if (EnableLoopDataPrefetch)
+      addPass(createLoopDataPrefetchPass());
+    if (EnableFalkorHWPFFix)
+      addPass(createFalkorMarkStridedAccessesPass());
+  }
 
   TargetPassConfig::addIRPasses();
 
   // Match interleaved memory accesses to ldN/stN intrinsics.
   if (TM->getOptLevel() != CodeGenOpt::None)
-    addPass(createInterleavedAccessPass(TM));
+    addPass(createInterleavedAccessPass());
 
   if (TM->getOptLevel() == CodeGenOpt::Aggressive && EnableGEPOpt) {
     // Call SeparateConstOffsetFromGEP pass to extract constants within indices
@@ -382,9 +395,6 @@ bool AArch64PassConfig::addPreISel() {
     addPass(createGlobalMergePass(TM, 4095, OnlyOptimizeForSize));
   }
 
-  if (TM->getOptLevel() != CodeGenOpt::None && EnableAddressTypePromotion)
-    addPass(createAArch64AddressTypePromotionPass());
-
   return false;
 }
 
@@ -416,6 +426,12 @@ bool AArch64PassConfig::addRegBankSelect() {
   return false;
 }
 
+void AArch64PassConfig::addPreGlobalInstructionSelect() {
+  // Workaround the deficiency of the fast register allocator.
+  if (TM->getOptLevel() == CodeGenOpt::None)
+    addPass(new Localizer());
+}
+
 bool AArch64PassConfig::addGlobalInstructionSelect() {
   addPass(new InstructionSelect());
   return false;
@@ -433,6 +449,8 @@ bool AArch64PassConfig::addILPOpts() {
     addPass(createAArch64ConditionalCompares());
   if (EnableMCR)
     addPass(&MachineCombinerID);
+  if (EnableCondBrTuning)
+    addPass(createAArch64CondBrTuning());
   if (EnableEarlyIfConversion)
     addPass(&EarlyIfConverterID);
   if (EnableStPairSuppress)
@@ -469,8 +487,12 @@ void AArch64PassConfig::addPreSched2() {
   // Expand some pseudo instructions to allow proper scheduling.
   addPass(createAArch64ExpandPseudoPass());
   // Use load/store pair instructions when possible.
-  if (TM->getOptLevel() != CodeGenOpt::None && EnableLoadStoreOpt)
-    addPass(createAArch64LoadStoreOptimizationPass());
+  if (TM->getOptLevel() != CodeGenOpt::None) {
+    if (EnableLoadStoreOpt)
+      addPass(createAArch64LoadStoreOptimizationPass());
+    if (EnableFalkorHWPFFix)
+      addPass(createFalkorHWPFFixPass());
+  }
 }
 
 void AArch64PassConfig::addPreEmitPass() {

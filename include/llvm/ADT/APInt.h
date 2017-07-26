@@ -157,6 +157,11 @@ private:
     return isSingleWord() ? U.VAL : U.pVal[whichWord(bitPosition)];
   }
 
+  /// Utility method to change the bit width of this APInt to new bit width,
+  /// allocating and/or deallocating as necessary. There is no guarantee on the
+  /// value of any bits upon return. Caller should populate the bits after.
+  void reallocate(unsigned NewBitWidth);
+
   /// \brief Convert a char array into an APInt
   ///
   /// \param radix 2, 8, 10, 16, or 36
@@ -177,8 +182,9 @@ private:
   /// provides a more convenient form of divide for internal use since KnuthDiv
   /// has specific constraints on its inputs. If those constraints are not met
   /// then it provides a simpler form of divide.
-  static void divide(const APInt &LHS, unsigned lhsWords, const APInt &RHS,
-                     unsigned rhsWords, APInt *Quotient, APInt *Remainder);
+  static void divide(const WordType *LHS, unsigned lhsWords,
+                     const WordType *RHS, unsigned rhsWords, WordType *Quotient,
+                     WordType *Remainder);
 
   /// out-of-line slow case for inline constructor
   void initSlowCase(uint64_t val, bool isSigned);
@@ -206,6 +212,12 @@ private:
 
   /// out-of-line slow case for countLeadingZeros
   unsigned countLeadingZerosSlowCase() const LLVM_READONLY;
+
+  /// out-of-line slow case for countLeadingOnes.
+  unsigned countLeadingOnesSlowCase() const LLVM_READONLY;
+
+  /// out-of-line slow case for countTrailingZeros.
+  unsigned countTrailingZerosSlowCase() const LLVM_READONLY;
 
   /// out-of-line slow case for countTrailingOnes
   unsigned countTrailingOnesSlowCase() const LLVM_READONLY;
@@ -377,7 +389,7 @@ public:
   bool isAllOnesValue() const {
     if (isSingleWord())
       return U.VAL == WORD_MAX >> (APINT_BITS_PER_WORD - BitWidth);
-    return countPopulationSlowCase() == BitWidth;
+    return countTrailingOnesSlowCase() == BitWidth;
   }
 
   /// \brief Determine if all bits are clear
@@ -385,6 +397,15 @@ public:
   /// This checks to see if the value has all bits of the APInt are clear or
   /// not.
   bool isNullValue() const { return !*this; }
+
+  /// \brief Determine if this is a value of 1.
+  ///
+  /// This checks to see if the value of this APInt is one.
+  bool isOneValue() const {
+    if (isSingleWord())
+      return U.VAL == 1;
+    return countLeadingZerosSlowCase() == BitWidth - 1;
+  }
 
   /// \brief Determine if this is the largest unsigned value.
   ///
@@ -397,7 +418,9 @@ public:
   /// This checks to see if the value of this APInt is the maximum signed
   /// value for the APInt's bit width.
   bool isMaxSignedValue() const {
-    return !isNegative() && countPopulation() == BitWidth - 1;
+    if (isSingleWord())
+      return U.VAL == ((WordType(1) << (BitWidth - 1)) - 1);
+    return !isNegative() && countTrailingOnesSlowCase() == BitWidth - 1;
   }
 
   /// \brief Determine if this is the smallest unsigned value.
@@ -411,7 +434,9 @@ public:
   /// This checks to see if the value of this APInt is the minimum signed
   /// value for the APInt's bit width.
   bool isMinSignedValue() const {
-    return isNegative() && isPowerOf2();
+    if (isSingleWord())
+      return U.VAL == (WordType(1) << (BitWidth - 1));
+    return isNegative() && countTrailingZerosSlowCase() == BitWidth - 1;
   }
 
   /// \brief Check if this APInt has an N-bits unsigned integer value.
@@ -842,6 +867,7 @@ public:
   ///
   /// \returns *this
   APInt &operator*=(const APInt &RHS);
+  APInt &operator*=(uint64_t RHS);
 
   /// \brief Addition assignment operator.
   ///
@@ -1010,11 +1036,13 @@ public:
   ///
   /// \returns a new APInt value containing the division result
   APInt udiv(const APInt &RHS) const;
+  APInt udiv(uint64_t RHS) const;
 
   /// \brief Signed division function for APInt.
   ///
   /// Signed divide this APInt by APInt RHS.
   APInt sdiv(const APInt &RHS) const;
+  APInt sdiv(int64_t RHS) const;
 
   /// \brief Unsigned remainder operation.
   ///
@@ -1026,11 +1054,13 @@ public:
   ///
   /// \returns a new APInt value containing the remainder result
   APInt urem(const APInt &RHS) const;
+  uint64_t urem(uint64_t RHS) const;
 
   /// \brief Function for signed remainder operation.
   ///
   /// Signed remainder operation on APInt.
   APInt srem(const APInt &RHS) const;
+  int64_t srem(int64_t RHS) const;
 
   /// \brief Dual division/remainder interface.
   ///
@@ -1041,9 +1071,13 @@ public:
   /// udivrem(X, Y, X, Y), for example.
   static void udivrem(const APInt &LHS, const APInt &RHS, APInt &Quotient,
                       APInt &Remainder);
+  static void udivrem(const APInt &LHS, uint64_t RHS, APInt &Quotient,
+                      uint64_t &Remainder);
 
   static void sdivrem(const APInt &LHS, const APInt &RHS, APInt &Quotient,
                       APInt &Remainder);
+  static void sdivrem(const APInt &LHS, int64_t RHS, APInt &Quotient,
+                      int64_t &Remainder);
 
   // Operations that return overflow indicators.
   APInt sadd_ov(const APInt &RHS, bool &Overflow) const;
@@ -1061,9 +1095,7 @@ public:
   /// \returns the bit value at bitPosition
   bool operator[](unsigned bitPosition) const {
     assert(bitPosition < getBitWidth() && "Bit position out of bounds!");
-    return (maskBit(bitPosition) &
-            (isSingleWord() ? U.VAL : U.pVal[whichWord(bitPosition)])) !=
-           0;
+    return (maskBit(bitPosition) & getWord(bitPosition)) != 0;
   }
 
   /// @}
@@ -1436,6 +1468,12 @@ public:
   /// as "bitPosition".
   void flipBit(unsigned bitPosition);
 
+  /// Negate this APInt in place.
+  void negate() {
+    flipAllBits();
+    ++(*this);
+  }
+
   /// Insert the bits from a smaller APInt starting at bitPosition.
   void insertBits(const APInt &SubBits, unsigned bitPosition);
 
@@ -1550,7 +1588,11 @@ public:
   ///
   /// \returns 0 if the high order bit is not set, otherwise returns the number
   /// of 1 bits from the most significant to the least
-  unsigned countLeadingOnes() const LLVM_READONLY;
+  unsigned countLeadingOnes() const {
+    if (isSingleWord())
+      return llvm::countLeadingOnes(U.VAL << (APINT_BITS_PER_WORD - BitWidth));
+    return countLeadingOnesSlowCase();
+  }
 
   /// Computes the number of leading bits of this APInt that are equal to its
   /// sign bit.
@@ -1566,7 +1608,11 @@ public:
   ///
   /// \returns BitWidth if the value is zero, otherwise returns the number of
   /// zeros from the least significant bit to the first one bit.
-  unsigned countTrailingZeros() const LLVM_READONLY;
+  unsigned countTrailingZeros() const {
+    if (isSingleWord())
+      return std::min(unsigned(llvm::countTrailingZeros(U.VAL)), BitWidth);
+    return countTrailingZerosSlowCase();
+  }
 
   /// \brief Count the number of trailing one bits.
   ///
@@ -1645,12 +1691,7 @@ public:
   /// re-interprets the bits as a double. Note that it is valid to do this on
   /// any bit width. Exactly 64 bits will be translated.
   double bitsToDouble() const {
-    union {
-      uint64_t I;
-      double D;
-    } T;
-    T.I = (isSingleWord() ? U.VAL : U.pVal[0]);
-    return T.D;
+    return BitsToDouble(getWord(0));
   }
 
   /// \brief Converts APInt bits to a double
@@ -1659,12 +1700,7 @@ public:
   /// re-interprets the bits as a float. Note that it is valid to do this on
   /// any bit width. Exactly 32 bits will be translated.
   float bitsToFloat() const {
-    union {
-      unsigned I;
-      float F;
-    } T;
-    T.I = unsigned((isSingleWord() ? U.VAL : U.pVal[0]));
-    return T.F;
+    return BitsToFloat(getWord(0));
   }
 
   /// \brief Converts a double to APInt bits.
@@ -1672,12 +1708,7 @@ public:
   /// The conversion does not do a translation from double to integer, it just
   /// re-interprets the bits of the double.
   static APInt doubleToBits(double V) {
-    union {
-      uint64_t I;
-      double D;
-    } T;
-    T.D = V;
-    return APInt(sizeof T * CHAR_BIT, T.I);
+    return APInt(sizeof(double) * CHAR_BIT, DoubleToBits(V));
   }
 
   /// \brief Converts a float to APInt bits.
@@ -1685,12 +1716,7 @@ public:
   /// The conversion does not do a translation from float to integer, it just
   /// re-interprets the bits of the float.
   static APInt floatToBits(float V) {
-    union {
-      unsigned I;
-      float F;
-    } T;
-    T.F = V;
-    return APInt(sizeof T * CHAR_BIT, T.I);
+    return APInt(sizeof(float) * CHAR_BIT, FloatToBits(V));
   }
 
   /// @}
@@ -1851,10 +1877,9 @@ public:
                         unsigned);
 
   /// DST = LHS * RHS, where DST has width the sum of the widths of the
-  /// operands.  No overflow occurs.  DST must be disjoint from both
-  /// operands. Returns the number of parts required to hold the result.
-  static unsigned tcFullMultiply(WordType *, const WordType *,
-                                 const WordType *, unsigned, unsigned);
+  /// operands. No overflow occurs. DST must be disjoint from both operands.
+  static void tcFullMultiply(WordType *, const WordType *,
+                             const WordType *, unsigned, unsigned);
 
   /// If RHS is zero LHS and REMAINDER are left unchanged, return one.
   /// Otherwise set LHS to LHS / RHS with the fractional part discarded, set
@@ -1996,8 +2021,7 @@ inline raw_ostream &operator<<(raw_ostream &OS, const APInt &I) {
 }
 
 inline APInt operator-(APInt v) {
-  v.flipAllBits();
-  ++v;
+  v.negate();
   return v;
 }
 
@@ -2027,7 +2051,7 @@ inline APInt operator-(APInt a, const APInt &b) {
 }
 
 inline APInt operator-(const APInt &a, APInt &&b) {
-  b = -std::move(b);
+  b.negate();
   b += a;
   return std::move(b);
 }
@@ -2038,8 +2062,18 @@ inline APInt operator-(APInt a, uint64_t RHS) {
 }
 
 inline APInt operator-(uint64_t LHS, APInt b) {
-  b = -std::move(b);
+  b.negate();
   b += LHS;
+  return b;
+}
+
+inline APInt operator*(APInt a, uint64_t RHS) {
+  a *= RHS;
+  return a;
+}
+
+inline APInt operator*(uint64_t LHS, APInt b) {
+  b *= LHS;
   return b;
 }
 
