@@ -1,0 +1,21 @@
+cxx_binary(
+  name = 'HowToUseJIT',
+  header_namespace = '',
+  headers = glob([
+    '*.h',
+  ]),
+  srcs = glob([
+    '*.cpp',
+  ]),
+  linker_flags = [
+    '-ldl',
+    '-lpthread',
+    '-lz',
+  ],
+  deps = [
+    '//:adt',
+    '//:support',
+    '//:executionengine',
+    '//:x86',
+  ],
+)
