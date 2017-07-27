@@ -72,6 +72,6 @@
 #define LLVM_VERSION_PATCH 0
 
 /* LLVM version string */
-#define LLVM_VERSION_STRING "5.0.0svn"
+#define LLVM_VERSION_STRING "5.0.0git-ae4a4daa994"
 
 #endif

@@ -242,7 +242,7 @@
 #define HAVE_SYS_UIO_H 1
 
 /* Define if the setupterm() function is supported this platform. */
-// #define HAVE_TERMINFO 1
+#define HAVE_TERMINFO 1
 
 /* Define if the xar_open() function is supported this platform. */
 /* #undef HAVE_LIBXAR */
@@ -350,32 +350,14 @@
 /* Host triple LLVM will be executed on */
 #define LLVM_HOST_TRIPLE "x86_64-unknown-linux-gnu"
 
-/* LLVM architecture name for the native architecture, if available */
-#define LLVM_NATIVE_ARCH X86
-
-/* LLVM name for the native AsmParser init function, if available */
-#define LLVM_NATIVE_ASMPARSER LLVMInitializeX86AsmParser
-
-/* LLVM name for the native AsmPrinter init function, if available */
-#define LLVM_NATIVE_ASMPRINTER LLVMInitializeX86AsmPrinter
-
-/* LLVM name for the native Disassembler init function, if available */
-#define LLVM_NATIVE_DISASSEMBLER LLVMInitializeX86Disassembler
-
-/* LLVM name for the native Target init function, if available */
-#define LLVM_NATIVE_TARGET LLVMInitializeX86Target
-
-/* LLVM name for the native TargetInfo init function, if available */
-#define LLVM_NATIVE_TARGETINFO LLVMInitializeX86TargetInfo
-
-/* LLVM name for the native target MC init function, if available */
-#define LLVM_NATIVE_TARGETMC LLVMInitializeX86TargetMC
-
 /* Define if this is Unixish platform */
 #define LLVM_ON_UNIX 1
 
 /* Define if this is Win32ish platform */
 /* #undef LLVM_ON_WIN32 */
+
+/* Define if overriding target triple is enabled */
+/* #undef LLVM_TARGET_TRIPLE_ENV */
 
 /* Define if we have the Intel JIT API runtime support library */
 #define LLVM_USE_INTEL_JITEVENTS 0
@@ -399,7 +381,7 @@
 #define LLVM_VERSION_PATCH 0
 
 /* LLVM version string */
-#define LLVM_VERSION_STRING "5.0.0svn"
+#define LLVM_VERSION_STRING "5.0.0git-ae4a4daa994"
 
 /* Define to the extension used for shared libraries, say, ".so". */
 #define LTDL_SHLIB_EXT ".so"
@@ -411,13 +393,13 @@
 #define PACKAGE_NAME "LLVM"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LLVM 5.0.0svn"
+#define PACKAGE_STRING "LLVM 5.0.0git-ae4a4daa994"
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "5.0.0svn"
+#define PACKAGE_VERSION "5.0.0git-ae4a4daa994"
 
 /* Define to the vendor of this package. */
 /* #undef PACKAGE_VENDOR */

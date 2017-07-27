@@ -113,6 +113,9 @@ cxx_library(
   srcs = glob([
     'lib/Demangle/**/*.cpp',
   ]),
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 prebuilt_cxx_library(
@@ -192,6 +195,9 @@ cxx_library(
     ':target',
     ':transforms',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -219,6 +225,9 @@ cxx_library(
     ':support',
     ':ir',
     ':mc',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -309,6 +318,9 @@ cxx_library(
     ':ir',
     ':passes',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -330,6 +342,9 @@ cxx_library(
     ':analysis',
     ':passes',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -349,6 +364,9 @@ cxx_library(
     ':analysis',
     ':bitcode',
     ':binaryformat',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -432,6 +450,9 @@ cxx_library(
     ':adt',
     ':support',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -506,6 +527,9 @@ cxx_library(
     ':irreader',
     ':linker',
     ':target',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
