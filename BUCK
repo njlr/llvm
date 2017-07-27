@@ -1,5 +1,3 @@
-include_defs('//BUCKAROO_DEPS')
-
 from os.path import basename
 from os.path import dirname
 import hashlib
@@ -161,6 +159,22 @@ cxx_library(
 )
 
 cxx_library(
+  name = 'binaryformat',
+  header_namespace = 'llvm',
+  exported_headers = subdir_glob([
+    ('include/llvm', 'BinaryFormat/**/*.h'),
+    ('include/llvm', 'BinaryFormat/**/*.def'),
+  ]),
+  srcs = glob([
+    'lib/BinaryFormat/**/*.cpp',
+  ]),
+  deps = [
+    ':adt',
+    ':support',
+  ],
+)
+
+cxx_library(
   name = 'codegen',
   header_namespace = 'llvm',
   exported_headers = subdir_glob([
@@ -256,6 +270,7 @@ cxx_library(
     ('include', 'llvm/PassAnalysisSupport.h'),
     ('include', 'llvm/InitializePasses.h'),
     ('include', 'llvm/Analysis/**/*.h'),
+    ('include', 'llvm/Analysis/**/*.def'),
     ('include', 'llvm/Bitcode/**/*.h'),
   ]), {
     'AttributesCompatFunc.inc': ':AttributesCompatFunc.inc',
@@ -266,6 +281,7 @@ cxx_library(
   deps = [
     ':adt',
     ':support',
+    ':binaryformat',
   ],
   visibility = [
     'PUBLIC',
@@ -301,6 +317,9 @@ cxx_library(
   exported_headers = subdir_glob([
     ('include/llvm', 'Bitcode/**/*.h'),
   ]),
+  headers = subdir_glob([
+    ('include/llvm', 'Object/**/*.h'),
+  ]),
   srcs = glob([
     'lib/Bitcode/**/*.cpp',
   ]),
@@ -329,6 +348,7 @@ cxx_library(
     ':ir',
     ':analysis',
     ':bitcode',
+    ':binaryformat',
   ],
 )
 
@@ -516,6 +536,7 @@ cxx_library(
     ':adt',
     ':cmake-generated',
     ':support',
+    ':binaryformat',
   ],
 )
 
@@ -532,9 +553,10 @@ cxx_library(
     ':adt',
     ':support',
     ':debuginfo',
+    ':binaryformat'
   ],
   visibility = [
-    '//...',
+    'PUBLIC',
   ],
 )
 

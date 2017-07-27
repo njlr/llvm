@@ -1,7 +1,3 @@
 {
-  "name": "llvm",
-  "dependencies": {
-    "madler/zlib": "1.2.11",
-    "github+njlr/libdl": "0.1.0"
-  }
+  "name": "llvm"
 }
