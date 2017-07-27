@@ -3,6 +3,7 @@
   ignore = .git, build
 
 [cxx]
-  cc = /usr/bin/clang
-  cxx = /usr/bin/clang++
-  cxxflags = -std=c++14
+  cc = /usr/bin/gcc
+  cxx = /usr/bin/g++
+  cxxflags = -std=c++14 -pthread -fPIC
+  ld = /usr/bin/clang++

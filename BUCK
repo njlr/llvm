@@ -7,6 +7,15 @@ def merge_dicts(x, y):
   z.update(y)
   return z;
 
+export_file(
+  name = 'OptParser.td',
+  src = 'include/llvm/Option/OptParser.td',
+  out = 'OptParser.td',
+  visibility = [
+    'PUBLIC',
+  ],
+)
+
 prebuilt_cxx_library(
   name = 'cmake-generated',
   header_only = True,
@@ -76,6 +85,7 @@ cxx_binary(
   ],
   linker_flags = [
     '-lpthread',
+    '-lncurses',
   ],
   deps = [
     ':adt',
@@ -113,9 +123,6 @@ cxx_library(
   srcs = glob([
     'lib/Demangle/**/*.cpp',
   ]),
-  visibility = [
-    'PUBLIC',
-  ],
 )
 
 prebuilt_cxx_library(
@@ -148,6 +155,10 @@ cxx_library(
   srcs = glob([
     'lib/Support/**/*.cpp',
   ]),
+  linker_flags = [
+    '-lncurses',
+    '-lpthread',
+  ],
   deps = [
     ':cmake-generated',
     ':adt',
@@ -174,6 +185,9 @@ cxx_library(
   deps = [
     ':adt',
     ':support',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -220,14 +234,15 @@ cxx_library(
   srcs = glob([
     'lib/Passes/**/*.cpp',
   ]),
+  visibility = [
+    'PUBLIC',
+  ],
   deps = [
     ':adt',
+    ':analysis',
     ':support',
     ':ir',
     ':mc',
-  ],
-  visibility = [
-    'PUBLIC',
   ],
 )
 
@@ -305,6 +320,8 @@ cxx_library(
     ('include/llvm', 'Analysis/**/*.def'),
   ]),
   headers = subdir_glob([
+    ('include/llvm', '*.h'),
+    ('include/llvm', 'Passes/**/*.h'),
     ('include/llvm', 'ProfileData/**/*.h'),
     ('include/llvm', 'ProfileData/**/*.inc'),
     ('include/llvm', 'Transforms/**/*.h'),
@@ -316,7 +333,6 @@ cxx_library(
   deps = [
     ':adt',
     ':ir',
-    ':passes',
   ],
   visibility = [
     'PUBLIC',
@@ -335,15 +351,15 @@ cxx_library(
   srcs = glob([
     'lib/Bitcode/**/*.cpp',
   ]),
+  visibility = [
+    'PUBLIC',
+  ],
   deps = [
     ':adt',
     ':support',
     ':ir',
     ':analysis',
     ':passes',
-  ],
-  visibility = [
-    'PUBLIC',
   ],
 )
 
@@ -400,6 +416,9 @@ cxx_library(
     ':support',
     ':ir',
     ':object',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -507,6 +526,9 @@ cxx_library(
     ':analysis',
     ':passes',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -597,6 +619,9 @@ cxx_library(
     ':adt',
     ':support',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -654,6 +679,9 @@ cxx_library(
     ':analysis',
     ':passes',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -676,6 +704,9 @@ cxx_library(
     ':object',
     ':transforms',
     ':executionengine',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
