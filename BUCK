@@ -173,7 +173,7 @@ cxx_library(
   ],
   deps = [
     ':pthread',
-    # ':dl',
+    ':dl',
     ':cmake-generated',
     ':adt',
     ':llvm-c',
