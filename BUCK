@@ -135,6 +135,14 @@ prebuilt_cxx_library(
   ],
 )
 
+prebuilt_cxx_library(
+  name = 'dl',
+  header_only = True,
+  exported_linker_flags = [
+    '-ldl',
+  ],
+)
+
 cxx_library(
   name = 'support',
   header_namespace = 'llvm',
@@ -165,6 +173,7 @@ cxx_library(
   ],
   deps = [
     ':pthread',
+    # ':dl',
     ':cmake-generated',
     ':adt',
     ':llvm-c',
@@ -230,6 +239,7 @@ cxx_library(
   headers = subdir_glob([
     ('include/llvm', 'Analysis/**/*.h'),
     ('include/llvm', 'Analysis/**/*.def'),
+    ('include/llvm', 'CodeGen/*.h'),
     ('include/llvm', 'Target/*.h'),
     ('include/llvm', 'Transforms/**/*.h'),
     ('include/llvm', 'ProfileData/**/*.h'),
@@ -542,6 +552,9 @@ cxx_library(
   exported_headers = subdir_glob([
     ('include/llvm', 'Transforms/**/*.h'),
   ]),
+  headers = subdir_glob([
+    ('include/llvm', 'CodeGen/**/*.h'),
+  ]),
   srcs = glob([
     'lib/Transforms/**/*.cpp',
   ]),
@@ -646,6 +659,7 @@ cxx_library(
     ':ir',
     ':support',
     ':debuginfo',
+    ':codegen',
     ':transforms',
   ],
   visibility = [
@@ -673,6 +687,9 @@ cxx_library(
   exported_headers = subdir_glob([
     ('include/llvm', 'Target/**/*.h'),
     ('include/llvm', 'Target/**/*.def'),
+  ]),
+  headers = subdir_glob([
+    ('include/llvm', 'CodeGen/**/*.h'),
   ]),
   srcs = glob([
     'lib/Target/*.cpp',
