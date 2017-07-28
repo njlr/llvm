@@ -7,15 +7,6 @@ def merge_dicts(x, y):
   z.update(y)
   return z;
 
-export_file(
-  name = 'OptParser.td',
-  src = 'include/llvm/Option/OptParser.td',
-  out = 'OptParser.td',
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
 prebuilt_cxx_library(
   name = 'cmake-generated',
   header_only = True,
@@ -71,6 +62,7 @@ cxx_binary(
   header_namespace = '',
   headers = subdir_glob([
     ('utils/TableGen', '**/*.h'),
+    ('include', 'llvm/CodeGen/**/*.h'),
     ('include', 'llvm/Target/**/*.h'),
     ('include', 'llvm/Target/**/*.def'),
     ('include', 'llvm/TableGen/**/*.h'),
@@ -125,15 +117,6 @@ cxx_library(
   ]),
 )
 
-prebuilt_cxx_library(
-  name = 'codegen-headers',
-  header_only = True,
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'CodeGen/**/*.h'),
-  ]),
-)
-
 cxx_library(
   name = 'support-c',
   srcs = glob([
@@ -144,6 +127,14 @@ cxx_library(
   ]
 )
 
+prebuilt_cxx_library(
+  name = 'pthread',
+  header_only = True,
+  exported_linker_flags = [
+    '-lpthread',
+  ],
+)
+
 cxx_library(
   name = 'support',
   header_namespace = 'llvm',
@@ -152,18 +143,31 @@ cxx_library(
     ('include/llvm', 'Support/**/*.inc'),
     ('include/llvm', 'Support/**/*.def'),
   ]),
+  headers = subdir_glob([
+    ('include/llvm', 'CodeGen/**/*.h'),
+  ]),
   srcs = glob([
     'lib/Support/**/*.cpp',
   ]),
   linker_flags = [
+    # '-v',
+    # '-lpthread',
     '-lncurses',
-    '-lpthread',
+    '-ltinfo',
+    '-ldl',
+  ],
+  # link_whole = True,
+  exported_linker_flags = [
+    # '-lpthread',
+    '-lncurses',
+    '-ltinfo',
+    '-ldl',
   ],
   deps = [
+    ':pthread',
     ':cmake-generated',
     ':adt',
     ':llvm-c',
-    ':codegen-headers',
     ':demangle',
     ':support-c',
   ],
@@ -287,6 +291,7 @@ cxx_library(
     'llvm/IR/Intrinsics.gen': ':Intrinsics.gen',
   }),
   headers = merge_dicts(subdir_glob([
+    ('include', 'llvm/CodeGen/**/*.h'),
     ('include', 'llvm/Pass.h'),
     ('include', 'llvm/PassInfo.h'),
     ('include', 'llvm/PassSupport.h'),
@@ -474,23 +479,23 @@ cxx_library(
   ],
 )
 
-cxx_library(
-  name = 'libdriver',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'LibDriver/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/LibDriver/**/*.cpp',
-  ]),
-  deps = [
-    tablegen('lib/LibDriver/Options.td', 'Options.inc', '-gen-opt-parser-defs'),
-    ':adt',
-    ':support',
-    ':object',
-    ':option',
-  ],
-)
+# cxx_library(
+#   name = 'libdriver',
+#   header_namespace = 'llvm',
+#   exported_headers = subdir_glob([
+#     ('include/llvm', 'LibDriver/**/*.h'),
+#   ]),
+#   srcs = glob([
+#     'lib/LibDriver/**/*.cpp',
+#   ]),
+#   deps = [
+#     tablegen('lib/LibDriver/Options.td', 'Options.inc', '-gen-opt-parser-defs'),
+#     ':adt',
+#     ':support',
+#     ':object',
+#     ':option',
+#   ],
+# )
 
 cxx_library(
   name = 'lineeditor',
@@ -711,6 +716,25 @@ cxx_library(
 )
 
 cxx_library(
+  name = 'testing',
+  header_namespace = 'llvm',
+  exported_headers = subdir_glob([
+    ('include/llvm', 'Testing/**/*.h'),
+  ]),
+  srcs = glob([
+    'lib/Testing/*.cpp',
+  ]),
+  deps = [
+    ':adt',
+    '//utils/unittest/googletest:gtest',
+    '//utils/unittest/googlemock:gmock',
+  ],
+  visibility = [
+    'PUBLIC',
+  ],
+)
+
+cxx_library(
   name = 'xray',
   header_namespace = 'llvm',
   exported_headers = subdir_glob([
@@ -723,6 +747,9 @@ cxx_library(
     ':adt',
     ':support',
     ':object',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1254,10 +1281,15 @@ prebuilt_cxx_library(
   exported_headers = subdir_glob([
     ('include', '**/*.h'),
   ]),
+  exported_linker_flags = [
+    '-lpthread',
+    '-lncurses',
+    '-ltinfo',
+  ],
   exported_deps = [
     ':cmake-generated',
-  ],
-  deps = [
+  # ],
+  # deps = [
     # Modules
     ':adt',
     ':analysis',
@@ -1270,7 +1302,7 @@ prebuilt_cxx_library(
     ':fuzzer',
     ':ir',
     ':irreader',
-    ':libdriver',
+    # ':libdriver',
     ':lineeditor',
     ':linker',
     ':lto',
@@ -1286,23 +1318,23 @@ prebuilt_cxx_library(
     ':transforms',
     ':xray',
     # Targets
-    ':aarch64',
-    ':amdgpu',
-    ':arm',
-    ':avr',
-    ':bpf',
-    ':hexagon',
-    ':lanai',
-    ':mips',
-    ':msp430',
-    ':nvptx',
-    ':powerpc',
-    ':riscv',
-    ':sparc',
-    ':systemz',
-    ':webassembly',
+    # ':aarch64',
+    # ':amdgpu',
+    # ':arm',
+    # ':avr',
+    # ':bpf',
+    # ':hexagon',
+    # ':lanai',
+    # ':mips',
+    # ':msp430',
+    # ':nvptx',
+    # ':powerpc',
+    # ':riscv',
+    # ':sparc',
+    # ':systemz',
+    # ':webassembly',
     ':x86',
-    ':xcore',
+    # ':xcore',
   ],
   visibility = [
     'PUBLIC',

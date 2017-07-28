@@ -242,7 +242,7 @@
 #define HAVE_SYS_UIO_H 1
 
 /* Define if the setupterm() function is supported this platform. */
-#define HAVE_TERMINFO 1
+// #define HAVE_TERMINFO 1
 
 /* Define if the xar_open() function is supported this platform. */
 /* #undef HAVE_LIBXAR */
@@ -266,7 +266,7 @@
 #define HAVE_WRITEV 1
 
 /* Define to 1 if you have the <zlib.h> header file. */
-#define HAVE_ZLIB_H 1
+// #define HAVE_ZLIB_H 1
 
 /* Have host's _alloca */
 /* #undef HAVE__ALLOCA */
@@ -342,7 +342,7 @@
 #define LLVM_ENABLE_THREADS 1
 
 /* Define if zlib compression is available */
-#define LLVM_ENABLE_ZLIB 1
+// #define LLVM_ENABLE_ZLIB 1
 
 /* Has gcc/MSVC atomic intrinsics */
 #define LLVM_HAS_ATOMICS 1

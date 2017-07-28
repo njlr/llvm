@@ -2,8 +2,12 @@
   glob_handler = watchman
   ignore = .git, build
 
+[build]
+  engine = deep
+
 [cxx]
   cc = /usr/bin/gcc
   cxx = /usr/bin/g++
-  cxxflags = -std=c++14 -pthread -fPIC
-  ld = /usr/bin/clang++
+  cxxflags = -std=c++14
+  ld = /usr/bin/g++
+  gtest_dep = //utils/unittest/googletest:gtest

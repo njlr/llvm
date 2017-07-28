@@ -1,0 +1,39 @@
+prebuilt_cxx_library(
+  name = 'pthread',
+  header_only = True,
+  exported_linker_flags = [
+    '-lpthread',
+  ],
+)
+
+cxx_library(
+  name = 'gtest',
+  header_namespace = '',
+  srcs = [
+    'src/gtest-all.cc',
+    # 'src/gtest.cc',
+  ],
+  headers = subdir_glob([
+    ('', 'src/*.h'),
+    ('', 'src/*.cc'),
+    ('include', 'internal/**/*.h'),
+  ]),
+  exported_headers = subdir_glob([
+    ('include', '**/*.h'),
+  ], excludes = [
+    'include/internal/**/*.h',
+  ]),
+  preprocessor_flags = [
+    '-U_STRICT_ANSI_',
+  ],
+  compiler_flags = [
+    '-std=c++14',
+  ],
+  visibility = [
+    'PUBLIC',
+  ],
+  deps = [
+    ':pthread',
+    '//:support',
+  ],
+)

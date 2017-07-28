@@ -1,0 +1,25 @@
+from os.path import splitext
+
+tests = glob([
+  '*.cpp',
+])
+
+for test in tests:
+  cxx_test(
+    name = splitext(test)[0],
+    srcs = [
+      test
+    ],
+    deps = [
+      '//:support',
+      '//utils/unittest/googletest:gtest',
+      '//utils/unittest/UnitTestMain:UnitTestMain',
+      '//:support',
+      '//:adt',
+      '//:testing',
+      '//:binaryformat',
+      '//:ir',
+      '//:support',
+      '//:testing',
+    ],
+  )

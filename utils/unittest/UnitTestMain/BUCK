@@ -1,0 +1,14 @@
+cxx_library(
+  name = 'UnitTestMain',
+  srcs = [
+    'TestMain.cpp',
+  ],
+  deps = [
+    '//utils/unittest/googletest:gtest',
+    '//utils/unittest/googlemock:gmock',
+    '//:support',
+  ],
+  visibility = [
+    'PUBLIC',
+  ],
+)
