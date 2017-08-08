@@ -9,13 +9,11 @@ cxx_binary(
   ]),
   linker_flags = [
     '-ldl',
+    '-lz',
+    '-lncurses',
   ],
   deps = [
-    '//:ir',
-    '//:passes',
-    '//:bitcode',
-    '//:codegen',
-    '//:executionengine',
+    '//:llvm',
     '//:x86',
   ],
 )

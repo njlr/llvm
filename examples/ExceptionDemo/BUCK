@@ -1,5 +1,5 @@
 cxx_binary(
-  name = 'HowToUseJIT',
+  name = 'ExceptionDemo',
   header_namespace = '',
   headers = glob([
     '*.h',

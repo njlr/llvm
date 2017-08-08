@@ -11,4 +11,5 @@
   cxxflags = -std=c++14
   ld = /usr/bin/g++
   gtest_dep = //utils/unittest/googletest:gtest
-  untracked_headers = warn
+  # untracked_headers = warn
+  untracked_headers_whitelist = /Applications/Xcode.app/Contents/Developer/.* /usr/include/sys/.*

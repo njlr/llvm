@@ -1,6 +1,6 @@
 from os.path import basename
 from os.path import dirname
-import hashlib
+from hashlib import sha256
 
 def merge_dicts(x, y):
   z = x.copy()
@@ -15,8 +15,8 @@ prebuilt_cxx_library(
     (
       'default',
       subdir_glob([
-        ('cmake-generated/linux-x86_64/include/llvm', '**/*.h'),
-        ('cmake-generated/linux-x86_64/include/llvm', '**/*.def'),
+        ('cmake-generated/macosx-x86_64/include/llvm', '**/*.h'),
+        ('cmake-generated/macosx-x86_64/include/llvm', '**/*.def'),
       ])
     ),
     (
@@ -36,40 +36,27 @@ prebuilt_cxx_library(
   ],
 )
 
-prebuilt_cxx_library(
-  name = 'adt',
-  header_only = True,
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'ADT/**/*.h'),
-  ]),
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-prebuilt_cxx_library(
-  name = 'llvm-c',
-  header_only = True,
-  header_namespace = 'llvm-c',
-  exported_headers = subdir_glob([
-    ('include/llvm-c', '**/*.h'),
-  ]),
-)
-
 cxx_binary(
   name = 'llvm-tblgen',
   header_namespace = '',
   headers = subdir_glob([
-    ('utils/TableGen', '**/*.h'),
+    ('include', 'llvm-c/**/*.h'),
+    ('include', 'llvm/ADT/**/*.h'),
     ('include', 'llvm/CodeGen/**/*.h'),
+    ('include', 'llvm/Demangle/**/*.h'),
     ('include', 'llvm/Target/**/*.h'),
     ('include', 'llvm/Target/**/*.def'),
     ('include', 'llvm/TableGen/**/*.h'),
     ('include', 'llvm/MC/**/*.h'),
+    ('include', 'llvm/Support/**/*.h'),
+    ('include', 'llvm/Support/**/*.def'),
+    ('utils/TableGen', '**/*.h'),
   ]),
   srcs = glob([
+    'lib/Demangle/**/*.cpp',
     'lib/TableGen/**/*.cpp',
+    'lib/Support/**/*.c',
+    'lib/Support/**/*.cpp',
     'utils/TableGen/**/*.cpp',
   ]),
   visibility = [
@@ -77,19 +64,23 @@ cxx_binary(
   ],
   linker_flags = [
     '-lpthread',
+    '-lz',
     '-lncurses',
   ],
   deps = [
-    ':adt',
-    ':support',
+    ':cmake-generated',
+    # ':adt',
+    # ':support',
   ],
 )
 
 def tablegen(x, n, t):
+  digest = sha256(x + n + t).hexdigest()[0:12]
   parent = dirname(x)
+  file_name = basename(n)
   genrule(
-    name = n,
-    out = n,
+    name = 'llvm-tblgen-' + n + '-' + digest,
+    out = file_name,
     srcs = glob([
       'include/llvm/**/*.td',
       parent + '/**/*.td',
@@ -97,673 +88,58 @@ def tablegen(x, n, t):
     cmd = '$(location :llvm-tblgen) ' + t + ' -I $SRCDIR/include -I $SRCDIR/' + parent + ' $SRCDIR/' + x + ' -o $OUT',
   )
   prebuilt_cxx_library(
-    name = 'lib' + n,
+    name = n + '-' + digest,
     header_namespace = '',
     header_only = True,
     exported_headers = {
-      n: ':' + n,
+      n: ':' + 'llvm-tblgen-' + n + '-' + digest,
     },
   )
-  return ':lib' + n
+  return ':' + n + '-' + digest
 
-cxx_library(
-  name = 'demangle',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Demangle/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Demangle/**/*.cpp',
-  ]),
-)
-
-cxx_library(
-  name = 'support-c',
-  srcs = glob([
-    'lib/Support/*.c',
-  ]),
-  deps = [
-    ':cmake-generated',
-  ]
-)
-
-prebuilt_cxx_library(
-  name = 'pthread',
-  header_only = True,
-  exported_linker_flags = [
-    '-lpthread',
-  ],
-)
-
-prebuilt_cxx_library(
-  name = 'dl',
-  header_only = True,
-  exported_linker_flags = [
-    '-ldl',
-  ],
-)
-
-cxx_library(
-  name = 'support',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Support/**/*.h'),
-    ('include/llvm', 'Support/**/*.inc'),
-    ('include/llvm', 'Support/**/*.def'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'CodeGen/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Support/**/*.cpp',
-  ]),
-  linker_flags = [
-    # '-v',
-    # '-lpthread',
-    '-lncurses',
-    '-ltinfo',
-    '-ldl',
-  ],
-  # link_whole = True,
-  exported_linker_flags = [
-    # '-lpthread',
-    '-lncurses',
-    '-ltinfo',
-    '-ldl',
-  ],
-  deps = [
-    ':pthread',
-    ':dl',
-    ':cmake-generated',
-    ':adt',
-    ':llvm-c',
-    ':demangle',
-    ':support-c',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'binaryformat',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'BinaryFormat/**/*.h'),
-    ('include/llvm', 'BinaryFormat/**/*.def'),
-  ]),
-  srcs = glob([
-    'lib/BinaryFormat/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'codegen',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'CodeGen/**/*.h'),
-    ('include/llvm', 'CodeGen/**/*.def'),
-  ]),
-  srcs = glob([
-    'lib/CodeGen/**/*.cpp',
-  ]),
-  deps = [
-    ':analysis',
-    ':support',
-    ':cmake-generated',
-    ':ir',
-    ':target',
-    ':transforms',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'passes',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Pass.h'),
-    ('include/llvm', 'InitializePasses.h'),
-    ('include/llvm', 'Pass*.h'),
-    ('include/llvm', 'Passes/**/*.h'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'Analysis/**/*.h'),
-    ('include/llvm', 'Analysis/**/*.def'),
-    ('include/llvm', 'CodeGen/*.h'),
-    ('include/llvm', 'Target/*.h'),
-    ('include/llvm', 'Transforms/**/*.h'),
-    ('include/llvm', 'ProfileData/**/*.h'),
-    ('include/llvm', 'ProfileData/**/*.inc'),
-  ]),
-  srcs = glob([
-    'lib/Passes/**/*.cpp',
-  ]),
-  visibility = [
-    'PUBLIC',
-  ],
-  deps = [
-    ':adt',
-    ':analysis',
-    ':support',
-    ':ir',
-    ':mc',
-  ],
-)
-
-genrule(
-  name = 'Attributes.gen',
-  out = 'Attributes.gen',
-  srcs = glob([
-    'include/llvm/IR/**/*.td',
-  ]),
-  cmd = '$(location :llvm-tblgen) -gen-attrs -I $SRCDIR/include $SRCDIR/include/llvm/IR/Attributes.td -o $OUT',
-)
-
-genrule(
-  name = 'Intrinsics.gen',
-  out = 'Intrinsics.gen',
-  srcs = glob([
-    'include/llvm/**/*.td',
-  ]),
-  cmd = '$(location :llvm-tblgen) -gen-intrinsic -I $SRCDIR/include $SRCDIR/include/llvm/IR/Intrinsics.td -o $OUT',
-)
-
-genrule(
-  name = 'AttributesCompatFunc.inc',
-  out = 'AttributesCompatFunc.inc',
-  srcs = glob([
-    'include/llvm/IR/**/*.gen',
-    'include/llvm/IR/**/*.td',
-    'lib/IR/**/*.td',
-  ]),
-  cmd = '$(location :llvm-tblgen) -gen-attrs -I $SRCDIR/include $SRCDIR/lib/IR/AttributesCompatFunc.td -o $OUT',
-)
-
-cxx_library(
-  name = 'ir',
-  header_namespace = '',
-  exported_headers = merge_dicts(subdir_glob([
-    ('include', 'llvm/IR/**/*.h'),
-    ('include', 'llvm/IR/**/*.def'),
-    ('include', 'llvm/IR/**/*.gen'),
-  ]), {
-    'llvm/IR/Attributes.gen': ':Attributes.gen',
-    'llvm/IR/Intrinsics.gen': ':Intrinsics.gen',
-  }),
-  headers = merge_dicts(subdir_glob([
-    ('include', 'llvm/CodeGen/**/*.h'),
-    ('include', 'llvm/Pass.h'),
-    ('include', 'llvm/PassInfo.h'),
-    ('include', 'llvm/PassSupport.h'),
-    ('include', 'llvm/PassRegistry.h'),
-    ('include', 'llvm/PassAnalysisSupport.h'),
-    ('include', 'llvm/InitializePasses.h'),
-    ('include', 'llvm/Analysis/**/*.h'),
-    ('include', 'llvm/Analysis/**/*.def'),
-    ('include', 'llvm/Bitcode/**/*.h'),
-  ]), {
-    'AttributesCompatFunc.inc': ':AttributesCompatFunc.inc',
-  }),
-  srcs = glob([
-    'lib/IR/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':binaryformat',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'analysis',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Analysis/**/*.h'),
-    ('include/llvm', 'Analysis/**/*.def'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', '*.h'),
-    ('include/llvm', 'Passes/**/*.h'),
-    ('include/llvm', 'ProfileData/**/*.h'),
-    ('include/llvm', 'ProfileData/**/*.inc'),
-    ('include/llvm', 'Transforms/**/*.h'),
-    ('include/llvm', 'Object/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Analysis/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':ir',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'bitcode',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Bitcode/**/*.h'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'Object/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Bitcode/**/*.cpp',
-  ]),
-  visibility = [
-    'PUBLIC',
-  ],
-  deps = [
-    ':adt',
-    ':support',
-    ':ir',
-    ':analysis',
-    ':passes',
-  ],
-)
-
-cxx_library(
-  name = 'object',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Object/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Object/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':mc',
-    ':ir',
-    ':analysis',
-    ':bitcode',
-    ':binaryformat',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'objectyaml',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'ObjectYAML/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/ObjectYAML/**/*.cpp',
-  ]),
-  deps = [
-    ':support',
-    ':object',
-  ],
-)
-
-cxx_library(
-  name = 'profiledata',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'ProfileData/**/*.h'),
-    ('include/llvm', 'ProfileData/**/*.inc'),
-  ]),
-  srcs = glob([
-    'lib/ProfileData/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':ir',
-    ':object',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'asmparser',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'AsmParser/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/AsmParser/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':ir',
-    ':passes',
-  ],
-)
-
-cxx_library(
-  name = 'irreader',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'IRReader/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/IRReader/**/*.cpp',
-  ]),
-  deps = [
-    ':llvm-c',
-    ':support',
-    ':asmparser',
-    ':bitcode',
-  ],
-)
-
-cxx_library(
-  name = 'option',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Option/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Option/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-# cxx_library(
-#   name = 'libdriver',
-#   header_namespace = 'llvm',
-#   exported_headers = subdir_glob([
-#     ('include/llvm', 'LibDriver/**/*.h'),
-#   ]),
-#   srcs = glob([
-#     'lib/LibDriver/**/*.cpp',
-#   ]),
-#   deps = [
-#     tablegen('lib/LibDriver/Options.td', 'Options.inc', '-gen-opt-parser-defs'),
-#     ':adt',
-#     ':support',
-#     ':object',
-#     ':option',
-#   ],
-# )
-
-cxx_library(
-  name = 'lineeditor',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'LineEditor/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/LineEditor/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-  ],
-)
-
-cxx_library(
-  name = 'linker',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Linker/**/*.h'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'Transforms/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Linker/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':ir',
-    ':analysis',
-    ':passes',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'transforms',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Transforms/**/*.h'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'CodeGen/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Transforms/**/*.cpp',
-  ]),
-  deps = [
-    ':ir',
-    ':analysis',
-    ':passes',
-    ':profiledata',
-    ':bitcode',
-    ':irreader',
-    ':linker',
-    ':target',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-debuginfo_windows_sources = glob([
+windows_srcs = glob([
   'lib/DebugInfo/PDB/**/*.cpp',
 ])
 
-debuginfo_platform_sources = debuginfo_windows_sources
+platform_srcs = windows_srcs
 
 cxx_library(
-  name = 'debuginfo',
-  header_namespace = 'llvm',
+  name = 'llvm',
+  header_namespace = '',
   exported_headers = subdir_glob([
-    ('include/llvm', 'DebugInfo/**/*.h'),
-    ('include/llvm', 'DebugInfo/**/*.def'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'Object/**/*.h'),
-    ('include/llvm', 'MC/**/*.h'),
+    ('include', 'llvm-c/**/*.h'),
+    ('include', 'llvm/**/*.h'),
+    ('include', 'llvm/**/*.def'),
+    ('include', 'llvm/**/*.inc'),
   ]),
   srcs = glob([
-    'lib/DebugInfo/**/*.cpp',
-  ], excludes = debuginfo_platform_sources),
-  platform_srcs = [
-    ('^windows.*', debuginfo_windows_sources),
-  ],
-  deps = [
-    ':adt',
-    ':cmake-generated',
-    ':support',
-    ':binaryformat',
-  ],
-)
-
-cxx_library(
-  name = 'mc',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'MC/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/MC/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':debuginfo',
-    ':binaryformat'
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'tablegen',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'TableGen/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/TableGen/**/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'executionengine',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'ExecutionEngine/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/ExecutionEngine/**/*.cpp',
-  ], excludes = glob([
+    'lib/**/*.c',
+    'lib/**/*.cpp',
+  ], excludes = platform_srcs + glob([
     'lib/ExecutionEngine/IntelJITEvents/**/*.cpp',
     'lib/ExecutionEngine/OProfileJIT/**/*.cpp',
-  ])),
-  deps = [
-    ':cmake-generated',
-    ':ir',
-    ':support',
-    ':debuginfo',
-    ':codegen',
-    ':transforms',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'fuzzer',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Fuzzer/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Fuzzer/**/*.cpp',
-  ], excludes = glob([
+    'lib/ExecutionEngine/IntelJITEvents/jitprofiling.c', # TODO: Remove!
     'lib/Fuzzer/FuzzerTracePC.cpp',
     'lib/Fuzzer/test/**/*.cpp',
+    'lib/Target/*/**/*.cpp',
+    'lib/Testing/**/*.cpp',
+    'lib/ToolDrivers/**/*.cpp', # TODO: Remove!
   ])),
-)
-
-cxx_library(
-  name = 'target',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Target/**/*.h'),
-    ('include/llvm', 'Target/**/*.def'),
-  ]),
-  headers = subdir_glob([
-    ('include/llvm', 'CodeGen/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Target/*.cpp',
-  ]),
+  platform_srcs = [
+    ('^windows.*', windows_srcs),
+  ],
+  linker_flags = [
+    '-lpthread',
+    '-lz',
+    '-lncurses',
+  ],
   deps = [
-    ':adt',
-    ':support',
-    ':mc',
-    ':analysis',
-    ':passes',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'lto',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'LTO/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/LTO/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':ir',
-    ':passes',
-    ':analysis',
-    ':target',
-    ':linker',
-    ':object',
-    ':transforms',
-    ':executionengine',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'testing',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'Testing/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/Testing/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    '//utils/unittest/googletest:gtest',
-    '//utils/unittest/googlemock:gmock',
-  ],
-  visibility = [
-    'PUBLIC',
-  ],
-)
-
-cxx_library(
-  name = 'xray',
-  header_namespace = 'llvm',
-  exported_headers = subdir_glob([
-    ('include/llvm', 'XRay/**/*.h'),
-  ]),
-  srcs = glob([
-    'lib/XRay/*.cpp',
-  ]),
-  deps = [
-    ':adt',
-    ':support',
-    ':object',
+    ':cmake-generated',
+    tablegen('include/llvm/IR/Attributes.td', 'llvm/IR/Attributes.gen', '-gen-attrs'),
+    tablegen('include/llvm/IR/Intrinsics.td', 'llvm/IR/Intrinsics.gen', '-gen-intrinsic'),
+    tablegen('lib/IR/AttributesCompatFunc.td', 'AttributesCompatFunc.inc', '-gen-attrs'),
+    tablegen('lib/ToolDrivers/llvm-dlltool/Options.td', 'lib/ToolDrivers/llvm-dlltool/Options.inc', '-gen-opt-parser-defs'),
+    tablegen('lib/ToolDrivers/llvm-lib/Options.td', 'lib/ToolDrivers/llvm-lib/Options.inc', '-gen-opt-parser-defs'),
   ],
   visibility = [
     'PUBLIC',
@@ -805,6 +181,9 @@ cxx_library(
     ':ir',
     ':transforms',
   ],
+  visibility = [
+    'PUBLIC',
+  ],
 )
 
 cxx_library(
@@ -840,12 +219,10 @@ cxx_library(
     tablegen('lib/Target/AMDGPU/AMDGPU.td', 'AMDGPUGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
     tablegen('lib/Target/AMDGPU/AMDGPU.td', 'AMDGPUGenDFAPacketizer.inc', '-gen-dfa-packetizer'),
     tablegen('lib/Target/AMDGPU/AMDGPU.td', 'AMDGPUGenRegisterBank.inc', '-gen-register-bank'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -877,12 +254,10 @@ cxx_library(
     tablegen('lib/Target/ARM/ARM.td', 'ARMGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
     tablegen('lib/Target/ARM/ARM.td', 'ARMGenRegisterBank.inc', '-gen-register-bank'),
     tablegen('lib/Target/ARM/ARM.td', 'ARMGenGlobalISel.inc', '-gen-global-isel'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -906,12 +281,10 @@ cxx_library(
     tablegen('lib/Target/AVR/AVR.td', 'AVRGenDisassemblerTables.inc', '-gen-disassembler'),
     tablegen('lib/Target/AVR/AVR.td', 'AVRGenAsmMatcher.inc', '-gen-asm-matcher'),
     tablegen('lib/Target/AVR/AVR.td', 'AVRGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -935,12 +308,10 @@ cxx_library(
     tablegen('lib/Target/BPF/BPF.td', 'BPFGenDisassemblerTables.inc', '-gen-disassembler'),
     tablegen('lib/Target/BPF/BPF.td', 'BPFGenAsmMatcher.inc', '-gen-asm-matcher'),
     tablegen('lib/Target/BPF/BPF.td', 'BPFGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -965,12 +336,10 @@ cxx_library(
     tablegen('lib/Target/Hexagon/Hexagon.td', 'HexagonGenAsmMatcher.inc', '-gen-asm-matcher'),
     tablegen('lib/Target/Hexagon/Hexagon.td', 'HexagonGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
     tablegen('lib/Target/Hexagon/Hexagon.td', 'HexagonGenDFAPacketizer.inc', '-gen-dfa-packetizer'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -995,12 +364,10 @@ cxx_library(
     tablegen('lib/Target/Lanai/Lanai.td', 'LanaiGenAsmMatcher.inc', '-gen-asm-matcher'),
     tablegen('lib/Target/Lanai/Lanai.td', 'LanaiGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
     tablegen('lib/Target/Lanai/Lanai.td', 'LanaiGenDFAPacketizer.inc', '-gen-dfa-packetizer'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1026,12 +393,10 @@ cxx_library(
     tablegen('lib/Target/Mips/Mips.td', 'MipsGenAsmMatcher.inc', '-gen-asm-matcher'),
     tablegen('lib/Target/Mips/Mips.td', 'MipsGenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
     tablegen('lib/Target/Mips/Mips.td', 'MipsGenDFAPacketizer.inc', '-gen-dfa-packetizer'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1056,12 +421,10 @@ cxx_library(
     tablegen('lib/Target/MSP430/MSP430.td', 'MSP430GenDisassemblerTables.inc', '-gen-disassembler'),
     tablegen('lib/Target/MSP430/MSP430.td', 'MSP430GenMCPseudoLowering.inc', '-gen-pseudo-lowering'),
     tablegen('lib/Target/MSP430/MSP430.td', 'MSP430GenDFAPacketizer.inc', '-gen-dfa-packetizer'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1080,12 +443,10 @@ cxx_library(
     tablegen('lib/Target/NVPTX/NVPTX.td', 'NVPTXGenSubtargetInfo.inc', '-gen-subtarget'),
     tablegen('lib/Target/NVPTX/NVPTX.td', 'NVPTXGenDAGISel.inc', '-gen-dag-isel'),
     tablegen('lib/Target/NVPTX/NVPTX.td', 'NVPTXGenAsmWriter.inc', '-gen-asm-writer'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1109,12 +470,10 @@ cxx_library(
     tablegen('lib/Target/PowerPC/PPC.td', 'PPCGenFastISel.inc', '-gen-fast-isel'),
     tablegen('lib/Target/PowerPC/PPC.td', 'PPCGenCallingConv.inc', '-gen-callingconv'),
     tablegen('lib/Target/PowerPC/PPC.td', 'PPCGenSubtargetInfo.inc', '-gen-subtarget'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1131,12 +490,10 @@ cxx_library(
     tablegen('lib/Target/RISCV/RISCV.td', 'RISCVGenMCCodeEmitter.inc', '-gen-emitter'),
     tablegen('lib/Target/RISCV/RISCV.td', 'RISCVGenRegisterInfo.inc', '-gen-register-info'),
     tablegen('lib/Target/RISCV/RISCV.td', 'RISCVGenInstrInfo.inc', '-gen-instr-info'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1159,12 +516,10 @@ cxx_library(
     tablegen('lib/Target/Sparc/Sparc.td', 'SparcGenDAGISel.inc', '-gen-dag-isel'),
     tablegen('lib/Target/Sparc/Sparc.td', 'SparcGenCallingConv.inc', '-gen-callingconv'),
     tablegen('lib/Target/Sparc/Sparc.td', 'SparcGenSubtargetInfo.inc', '-gen-subtarget'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1187,12 +542,10 @@ cxx_library(
     tablegen('lib/Target/SystemZ/SystemZ.td', 'SystemZGenDAGISel.inc', '-gen-dag-isel'),
     tablegen('lib/Target/SystemZ/SystemZ.td', 'SystemZGenCallingConv.inc', '-gen-callingconv'),
     tablegen('lib/Target/SystemZ/SystemZ.td', 'SystemZGenSubtargetInfo.inc', '-gen-subtarget'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1213,12 +566,10 @@ cxx_library(
     tablegen('lib/Target/WebAssembly/WebAssembly.td', 'WebAssemblyGenFastISel.inc', '-gen-fast-isel'),
     tablegen('lib/Target/WebAssembly/WebAssembly.td', 'WebAssemblyGenAsmWriter.inc', '-gen-asm-writer'),
     tablegen('lib/Target/WebAssembly/WebAssembly.td', 'WebAssemblyGenMCCodeEmitter.inc', '-gen-emitter'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
+    ':llvm',
+  ],
+  visibility = [
+    'PUBLIC',
   ],
 )
 
@@ -1249,13 +600,7 @@ cxx_library(
     tablegen('lib/Target/X86/X86.td', 'X86GenAsmMatcher.inc', '-gen-asm-matcher'),
     tablegen('lib/Target/X86/X86.td', 'X86GenEVEX2VEXTables.inc', '-gen-x86-EVEX2VEX-tables'),
     tablegen('lib/Target/X86/X86.td', 'X86GenRegisterBank.inc', '-gen-register-bank'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
-    ':codegen',
+    ':llvm',
   ],
   visibility = [
     'PUBLIC',
@@ -1280,78 +625,7 @@ cxx_library(
     tablegen('lib/Target/XCore/XCore.td', 'XCoreGenAsmWriter.inc', '-gen-asm-writer'),
     tablegen('lib/Target/XCore/XCore.td', 'XCoreGenCallingConv.inc', '-gen-callingconv'),
     tablegen('lib/Target/XCore/XCore.td', 'XCoreGenDisassemblerTables.inc', '-gen-disassembler'),
-    ':adt',
-    ':passes',
-    ':mc',
-    ':target',
-    ':ir',
-    ':transforms',
-  ],
-)
-
-# This is a convenience library so that consumers
-# don't have to depend on multiple modules.
-prebuilt_cxx_library(
-  name = 'llvm',
-  header_namespace = '',
-  header_only = True,
-  exported_headers = subdir_glob([
-    ('include', '**/*.h'),
-  ]),
-  exported_linker_flags = [
-    '-lpthread',
-    '-lncurses',
-    '-ltinfo',
-  ],
-  exported_deps = [
-    ':cmake-generated',
-  # ],
-  # deps = [
-    # Modules
-    ':adt',
-    ':analysis',
-    ':asmparser',
-    ':bitcode',
-    ':codegen',
-    ':debuginfo',
-    ':demangle',
-    ':executionengine',
-    ':fuzzer',
-    ':ir',
-    ':irreader',
-    # ':libdriver',
-    ':lineeditor',
-    ':linker',
-    ':lto',
-    ':mc',
-    ':object',
-    ':objectyaml',
-    ':option',
-    ':passes',
-    ':profiledata',
-    ':support',
-    ':tablegen',
-    ':target',
-    ':transforms',
-    ':xray',
-    # Targets
-    # ':aarch64',
-    # ':amdgpu',
-    # ':arm',
-    # ':avr',
-    # ':bpf',
-    # ':hexagon',
-    # ':lanai',
-    # ':mips',
-    # ':msp430',
-    # ':nvptx',
-    # ':powerpc',
-    # ':riscv',
-    # ':sparc',
-    # ':systemz',
-    # ':webassembly',
-    ':x86',
-    # ':xcore',
+    ':llvm',
   ],
   visibility = [
     'PUBLIC',

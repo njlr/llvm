@@ -1,5 +1,5 @@
 cxx_binary(
-  name = 'HowToUseJIT',
+  name = 'Fibonacci',
   header_namespace = '',
   headers = glob([
     '*.h',
